@@ -29,33 +29,117 @@
   (lambda (e)
 	(eval-in (env) e)))
 
+(define caar
+  (lambda (l)
+	(car (car l))))
+
 (define cadr
   (lambda (l)
 	(car (cdr l))))
 
-(define caddr
+(define cdar
   (lambda (l)
-	(car (cdr (cdr l)))))
+	(cdr (car l))))
 
-(define cadddr
+(define cddr
   (lambda (l)
-	(car (cdr (cdr (cdr l))))))
-
-(define caar
-  (lambda (l)
-	(car (car l))))
+	(cdr (cdr l))))
 
 (define caaar
   (lambda (l)
 	(car (car (car l)))))
 
+(define caadr
+  (lambda (l)
+	(car (car (cdr l)))))
+
+(define cadar
+  (lambda (l)
+	(car (cdr (car l)))))
+
+(define caddr
+  (lambda (l)
+	(car (cdr (cdr l)))))
+
+(define cdaar
+  (lambda (l)
+	(cdr (car (car l)))))
+
+(define cdadr
+  (lambda (l)
+	(cdr (car (cdr l)))))
+
+(define cddar
+  (lambda (l)
+	(cdr (cdr (car l)))))
+
+(define cdddr
+  (lambda (l)
+	(cdr (cdr (cdr l)))))
+
 (define caaaar
   (lambda (l)
 	(car (car (car (car l))))))
 
-(define cdar
+(define caaadr
   (lambda (l)
-	(cdr (car l))))
+	(car (car (car (cdr l))))))
+
+(define caadar
+  (lambda (l)
+	(car (car (cdr (car l))))))
+
+(define caaddr
+  (lambda (l)
+	(car (car (cdr (cdr l))))))
+
+(define cadaar
+  (lambda (l)
+	(car (cdr (car (car l))))))
+
+(define cadadr
+  (lambda (l)
+	(car (cdr (car (cdr l))))))
+
+(define caddar
+  (lambda (l)
+	(car (cdr (cdr (car l))))))
+
+(define cadddr
+  (lambda (l)
+	(car (cdr (cdr (cdr l))))))
+
+(define cdaaar
+  (lambda (l)
+	(cdr (car (car (car l))))))
+
+(define cdaadr
+  (lambda (l)
+	(cdr (car (car (cdr l))))))
+
+(define cdadar
+  (lambda (l)
+	(cdr (car (cdr (car l))))))
+
+(define cdaddr
+  (lambda (l)
+	(cdr (car (cdr (cdr l))))))
+
+(define cddaar
+  (lambda (l)
+	(cdr (cdr (car (car l))))))
+
+(define cddadr
+  (lambda (l)
+	(cdr (cdr (car (cdr l))))))
+
+(define cdddar
+  (lambda (l)
+	(cdr (cdr (cdr (car l))))))
+
+(define cddddr
+  (lambda (l)
+	(cdr (cdr (cdr (cdr l))))))
 
 ; Language essentials
 
@@ -94,6 +178,8 @@
 		 (if (eval-in environ (caar clauses))
 		   (eval-in environ (cons 'begin (cdar clauses)))
 		   (eval-in environ (cons 'cond (cdr clauses))))))
+
+(define else #t)
 
 ; Mathematics and Logic
 
@@ -149,7 +235,7 @@
 	  ((< i 0) '())
 	  ((= i 0) (car l))
 	  ((null? l) '())
-	  ((> i 0) (item (cdr l) (- i 1))))))
+	  (else (item (cdr l) (- i 1))))))
 
 ; For Tino :)
 
