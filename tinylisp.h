@@ -123,7 +123,6 @@ tl_object *tl_print(tl_interp *, tl_object *);
 tl_object *tl_eval(tl_interp *, tl_object *);
 tl_object *tl_apply(tl_interp *, tl_object *);
 
-tl_object *tl_cf_eval(tl_interp *, tl_object *);
 tl_object *tl_cf_evalin(tl_interp *, tl_object *);
 tl_object *tl_cf_apply(tl_interp *, tl_object *);
 

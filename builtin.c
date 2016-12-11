@@ -270,10 +270,6 @@ tl_object *tl_cf_null(tl_interp *in, tl_object *args) {
 	return _boolify(!first);
 }
 
-tl_object *tl_cf_eval(tl_interp *in, tl_object *args) {
-	return tl_eval(in, tl_eval(in, tl_first(args)));
-}
-
 tl_object *tl_cf_evalin(tl_interp *in, tl_object *args) {
 	tl_object *env = tl_eval(in, tl_first(args));
 	tl_object *expr = tl_eval(in, tl_first(tl_next(args)));

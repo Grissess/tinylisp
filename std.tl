@@ -25,6 +25,10 @@
 
 ; Silly aliases
 
+(define eval
+  (lambda (e)
+	(eval-in (env) e)))
+
 (define cadr
   (lambda (l)
 	(car (cdr l))))

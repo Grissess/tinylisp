@@ -39,7 +39,6 @@ void tl_interp_init(tl_interp *in) {
 	top_frm = _tl_frm_set("cdr", tl_new_cfunc(tl_cf_cdr), top_frm);
 	top_frm = _tl_frm_set("null?", tl_new_cfunc(tl_cf_null), top_frm);
 
-	top_frm = _tl_frm_set("eval", tl_new_cfunc(tl_cf_eval), top_frm);
 	top_frm = _tl_frm_set("eval-in", tl_new_cfunc(tl_cf_evalin), top_frm);
 	top_frm = _tl_frm_set("apply", tl_new_cfunc(tl_cf_apply), top_frm);
 
