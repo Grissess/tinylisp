@@ -2,6 +2,22 @@
 
 #include "tinylisp.h"
 
+void _print_pairs(tl_interp *in, tl_object *cur) {
+	while(cur) {
+		if(!tl_is_pair(cur)) {
+			in->printf(in->udata, ". ");
+			tl_print(in, cur);
+			cur = NULL;
+		} else {
+			tl_print(in, tl_first(cur));
+			if(tl_next(cur)) {
+				in->printf(in->udata, " ");
+			}
+			cur = tl_next(cur);
+		}
+	}
+}
+
 tl_object *tl_print(tl_interp *in, tl_object *obj) {
 	tl_object *cur;
 	if(!obj) {
@@ -23,20 +39,7 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 
 		case TL_PAIR:
 			in->printf(in->udata, "(");
-			cur = obj;
-			while(cur) {
-				if(!tl_is_pair(cur)) {
-					in->printf(in->udata, ". ");
-					tl_print(in, cur);
-					cur = NULL;
-				} else {
-					tl_print(in, tl_first(cur));
-					if(tl_next(cur)) {
-						in->printf(in->udata, " ");
-					}
-					cur = tl_next(cur);
-				}
-			}
+			_print_pairs(in, obj);
 			in->printf(in->udata, ")");
 			break;
 
@@ -56,20 +59,7 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			if(tl_is_macro(obj)) {
 				in->printf(in->udata, "%s ", obj->envn);
 			}
-			cur = obj->body;
-			while(cur) {
-				if(!tl_is_pair(cur)) {
-					in->printf(in->udata, ". ");
-					tl_print(in, cur);
-					cur = NULL;
-				} else {
-					tl_print(in, tl_first(cur));
-					if(tl_next(cur)) {
-						in->printf(in->udata, " ");
-					}
-					cur = tl_next(cur);
-				}
-			}
+			_print_pairs(in, obj->body);
 			in->printf(in->udata, ")");
 			break;
 
