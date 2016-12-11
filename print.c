@@ -53,6 +53,9 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			}
 			tl_print(in, obj->args);
 			in->printf(in->udata, " ");
+			if(tl_is_macro(obj)) {
+				in->printf(in->udata, "%s ", obj->envn);
+			}
 			cur = obj->body;
 			while(cur) {
 				if(!tl_is_pair(cur)) {

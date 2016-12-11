@@ -56,8 +56,9 @@ tl_object *tl_new_func(tl_object *args, tl_object *body, tl_object *env) {
 	return obj;
 }
 
-tl_object *tl_new_macro(tl_object *args, tl_object *body, tl_object *env) {
+tl_object *tl_new_macro(tl_object *args, const char *envn, tl_object *body, tl_object *env) {
 	tl_object *obj = tl_new_func(args, body, env);
+	obj->envn = strdup(envn);
 	obj->kind = TL_MACRO;
 	return obj;
 }
@@ -85,6 +86,9 @@ void tl_free(tl_object *obj) {
 			tl_free(obj->args);
 			tl_free(obj->body);
 			tl_free(obj->env);
+			if(obj->kind == TL_MACRO) {
+				free(obj->envn);
+			}
 			break;
 
 		default:

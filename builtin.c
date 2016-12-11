@@ -33,8 +33,13 @@ tl_object *tl_cf_lambda(tl_interp *in, tl_object *args) {
 
 tl_object *tl_cf_macro(tl_interp *in, tl_object *args) {
 	tl_object *fargs = tl_first(args);
-	tl_object *body = tl_next(args);
-	return tl_new_macro(fargs, body, in->env);
+	tl_object *envn = tl_first(tl_next(args));
+	tl_object *body = tl_next(tl_next(args));
+	if(!tl_is_sym(envn)) {
+		tl_error_set(in, tl_new_pair(tl_new_sym("Bad macro envname"), envn));
+		return in->false_;
+	}
+	return tl_new_macro(fargs, envn->str, body, in->env);
 }
 
 tl_object *tl_cf_define(tl_interp *in, tl_object *args) {
@@ -94,6 +99,10 @@ tl_object *tl_cf_setenv(tl_interp *in, tl_object *args) {
 	next = tl_eval(in, next);
 	first->env = next;
 	return in->true_;
+}
+
+tl_object *tl_cf_topenv(tl_interp *in, tl_object *args) {
+	return in->top_env;
 }
 
 tl_object *tl_cf_display(tl_interp *in, tl_object *args) {
@@ -263,6 +272,16 @@ tl_object *tl_cf_null(tl_interp *in, tl_object *args) {
 
 tl_object *tl_cf_eval(tl_interp *in, tl_object *args) {
 	return tl_eval(in, tl_eval(in, tl_first(args)));
+}
+
+tl_object *tl_cf_evalin(tl_interp *in, tl_object *args) {
+	tl_object *env = tl_eval(in, tl_first(args));
+	tl_object *expr = tl_eval(in, tl_first(tl_next(args)));
+	tl_object *old_env = in->env;
+	in->env = env;
+	tl_object *res = tl_eval(in, expr);
+	in->env = old_env;
+	return res;
 }
 
 tl_object *tl_cf_apply(tl_interp *in, tl_object *args) {

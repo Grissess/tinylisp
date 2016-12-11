@@ -34,6 +34,7 @@ typedef struct tl_object_s {
 			struct tl_object_s *args;
 			struct tl_object_s *body;
 			struct tl_object_s *env;
+			char *envn;  /* For macros only */
 		};
 	};
 } tl_object;
@@ -44,7 +45,7 @@ tl_object *tl_new_sym(const char *);
 tl_object *tl_new_pair(tl_object *, tl_object *);
 tl_object *tl_new_cfunc(tl_object *(*)(tl_interp *, tl_object *));
 tl_object *tl_new_func(tl_object *, tl_object *, tl_object *);
-tl_object *tl_new_macro(tl_object *, tl_object *, tl_object *);
+tl_object *tl_new_macro(tl_object *, const char *, tl_object *, tl_object *);
 void tl_free(tl_object *);
 
 #define tl_is_int(obj) ((obj) && (obj)->kind == TL_INT)
@@ -97,6 +98,7 @@ tl_object *tl_cf_define(tl_interp *, tl_object *);
 tl_object *tl_cf_set(tl_interp *, tl_object *);
 tl_object *tl_cf_env(tl_interp *, tl_object *);
 tl_object *tl_cf_setenv(tl_interp *, tl_object *);
+tl_object *tl_cf_topenv(tl_interp *, tl_object *);
 tl_object *tl_cf_display(tl_interp *, tl_object *);
 tl_object *tl_cf_if(tl_interp *, tl_object *);
 
@@ -122,6 +124,7 @@ tl_object *tl_eval(tl_interp *, tl_object *);
 tl_object *tl_apply(tl_interp *, tl_object *);
 
 tl_object *tl_cf_eval(tl_interp *, tl_object *);
+tl_object *tl_cf_evalin(tl_interp *, tl_object *);
 tl_object *tl_cf_apply(tl_interp *, tl_object *);
 
 tl_object *tl_read(tl_interp *, tl_object *);

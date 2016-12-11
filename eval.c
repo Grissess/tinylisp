@@ -57,10 +57,9 @@ tl_object *tl_apply(tl_interp *in, tl_object *args) {
 
 		case TL_FUNC:
 		case TL_MACRO:
-			in->env = tl_new_pair(callable->env, in->env);
 			if(
-				callable->kind == TL_FUNC && tl_list_len(fargs) != tl_list_len(callable->args)
-			||	callable->kind == TL_MACRO && tl_list_len(fargs) < tl_list_len(callable->args)) {
+				tl_is_func(callable)&& tl_list_len(fargs) != tl_list_len(callable->args)
+			||	tl_is_macro(callable) && tl_list_len(fargs) < tl_list_len(callable->args)) {
 				tl_error_set(in, tl_new_pair(tl_new_pair(tl_new_pair(tl_new_sym("Bad arity"), TL_EMPTY_LIST), tl_new_pair(args, TL_EMPTY_LIST)), tl_new_pair(fargs, TL_EMPTY_LIST)));
 				return in->false_;
 			}
@@ -69,17 +68,29 @@ tl_object *tl_apply(tl_interp *in, tl_object *args) {
 				fcur && acur;
 				fcur = tl_next(fcur), acur = tl_next(acur)
 			) {
-				if(callable->kind == TL_MACRO && !tl_next(acur)) {
+				if(tl_is_macro(callable) && !tl_next(acur)) {
 					frm = tl_new_pair(tl_new_pair(tl_first(acur), fcur), frm);
 				} else {
 					tl_object *val = tl_first(fcur);
-					if(callable->kind == TL_FUNC) {
+					if(tl_is_func(callable)) {
 						val = tl_eval(in, val);
 					}
 					frm = tl_new_pair(tl_new_pair(tl_first(acur), val), frm);
 				}
 			}
+			if(tl_is_macro(callable)) {
+				frm = tl_new_pair(tl_new_pair(tl_new_sym(callable->envn), in->env), frm);
+			}
+			/* XXX These must be postponed so that parameters are evaluated in
+			 * the right context */
+			//in->env = tl_new_pair(callable->env, in->env);
+			in->env = callable->env;
 			in->env = tl_new_pair(frm, in->env);
+			//in->printf(in->udata, "Call env: ");
+			//tl_print(in, in->env);
+			//in->printf(in->udata, "\n\n- Old env: ");
+			//tl_print(in, old_env);
+			//in->printf(in->udata, "\n\n");
 			tl_object *res = in->false_;
 			for(tl_list_iter(callable->body, expr)) {
 				res = tl_eval(in, expr);

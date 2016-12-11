@@ -18,6 +18,11 @@
 	  v
 	  (f (car l) (foldl f v (cdr l))))))
 
+(define binswap
+  (lambda (f)
+	(lambda (a b)
+	  (f b a))))
+
 ; Silly aliases
 
 (define cadr
@@ -57,28 +62,34 @@
 	  (last (cdr l)))))
 
 (define begin
-  (macro (rest)
-		 (last (map eval rest))))
+  (macro (rest) environ
+		 (last (map (lambda (x) (eval-in environ x)) rest))))
 
 (define list
-  (macro (rest)
-		 (foldl cons '() (map eval rest))))
+  (macro (rest) environ
+		 (foldl cons '() (map (lambda (x) (eval-in environ x)) rest))))
 
 (define let
-  (macro (bindings body)
-		 (eval (cons (cons 'lambda (cons (map car bindings) body)) (map cadr bindings)))))
+  (macro (bindings body) environ
+		 (eval-in environ (cons (cons 'lambda (cons (map car bindings) body)) (map cadr bindings)))))
 
 (define let*
-  (macro (bindings body)
-		 (if (null? bindings)
-		   (eval (cons 'begin body))
-		   (eval (cons 'let (cons (list (car bindings)) (list (cons 'let* (cons (cdr bindings) body)))))))))
+  (macro (bindings body) environ
+		 (eval-in environ (if (null? bindings)
+		   (cons 'begin body)
+		   (cons 'let (cons (cons (car bindings) '()) (cons (cons 'let* (cons (cdr bindings) body)) '())))))))
+
+;(define let*
+;  (macro (bindings body)
+;		 (if (null? bindings)
+;		   (cons 'begin body)
+;		   (cons (car bindings) (cons (cdr bindings) '())))))
 
 (define cond
-  (macro (clauses)
-		 (if (eval (caar clauses))
-		   (eval (cons 'begin (cdar clauses)))
-		   (eval (cons 'cond (cdr clauses))))))
+  (macro (clauses) environ
+		 (if (eval-in environ (caar clauses))
+		   (eval-in environ (cons 'begin (cdar clauses)))
+		   (eval-in environ (cons 'cond (cdr clauses))))))
 
 ; Mathematics and Logic
 
@@ -146,3 +157,4 @@
 (let ((a 1) (b (+ 2 2))) (display a) (display b))
 (let* ((a 1) (b (+ a 1))) (display a) (display b))
 (cond ((> 0 1) (display 1)) ((< 0 1) (display 2)))
+((binswap -) 3 5)

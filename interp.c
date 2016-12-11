@@ -18,7 +18,8 @@ void tl_interp_init(tl_interp *in) {
 	top_frm = _tl_frm_set("define", tl_new_cfunc(tl_cf_define), top_frm);
 	top_frm = _tl_frm_set("set!", tl_new_cfunc(tl_cf_set), top_frm);
 	top_frm = _tl_frm_set("env", tl_new_cfunc(tl_cf_env), top_frm);
-	top_frm = _tl_frm_set("setenv", tl_new_cfunc(tl_cf_setenv), top_frm);
+	top_frm = _tl_frm_set("set-env!", tl_new_cfunc(tl_cf_setenv), top_frm);
+	top_frm = _tl_frm_set("top-env", tl_new_cfunc(tl_cf_topenv), top_frm);
 	top_frm = _tl_frm_set("display", tl_new_cfunc(tl_cf_display), top_frm);
 	top_frm = _tl_frm_set("if", tl_new_cfunc(tl_cf_if), top_frm);
 
@@ -39,6 +40,7 @@ void tl_interp_init(tl_interp *in) {
 	top_frm = _tl_frm_set("null?", tl_new_cfunc(tl_cf_null), top_frm);
 
 	top_frm = _tl_frm_set("eval", tl_new_cfunc(tl_cf_eval), top_frm);
+	top_frm = _tl_frm_set("eval-in", tl_new_cfunc(tl_cf_evalin), top_frm);
 	top_frm = _tl_frm_set("apply", tl_new_cfunc(tl_cf_apply), top_frm);
 
 	top_frm = _tl_frm_set("read", tl_new_cfunc(tl_read), top_frm);
