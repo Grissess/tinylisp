@@ -43,12 +43,12 @@ tl_object *tl_new_cfunc(tl_object *(*cfunc)(tl_interp *, tl_object *)) {
 
 tl_object *tl_new_func(tl_object *args, tl_object *body, tl_object *env) {
 	tl_object *obj = tl_new();
-	assert(!args || tl_is_pair(args));
+	assert(tl_is_pair(args));
 	for(tl_list_iter(args, arg)) {
 		assert(tl_is_sym(arg));
 	}
-	assert(!body || tl_is_pair(body));
-	assert(!env || tl_is_pair(env));
+	assert(tl_is_pair(body));
+	assert(tl_is_pair(env));
 	obj->kind = TL_FUNC;
 	obj->args = args;
 	obj->body = body;

@@ -28,13 +28,6 @@ tl_object *tl_eval(tl_interp *in, tl_object *obj) {
 			tl_error_set(in, tl_new_sym("Eval empty expression"));
 			return in->false_;
 		}
-		if(tl_is_sym(first)) {
-			/* "special" function handling */
-			/* Quotations */
-			if(!strcmp(first->str, "quote")) {
-				return tl_first(next);
-			}
-		}
 		tl_object *callable = tl_eval(in, first);
 		return tl_apply(in, tl_new_pair(callable, next));
 	}

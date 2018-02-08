@@ -42,6 +42,13 @@ tl_object *tl_cf_macro(tl_interp *in, tl_object *args) {
 	return tl_new_macro(fargs, envn->str, body, in->env);
 }
 
+tl_object *tl_cf_prefix(tl_interp *in, tl_object *args) {
+	tl_object *prefix = tl_first(args);
+	tl_object *name = tl_first(tl_next(args));
+	in->prefixes = tl_new_pair(tl_new_pair(prefix, name), in->prefixes);
+	return in->true_;
+}
+
 tl_object *tl_cf_define(tl_interp *in, tl_object *args) {
 	tl_object *key = tl_first(args), *val = tl_first(tl_next(args));
 	if(!key) {
@@ -258,6 +265,21 @@ tl_object *tl_cf_car(tl_interp *in, tl_object *args) {
 
 tl_object *tl_cf_cdr(tl_interp *in, tl_object *args) {
 	return tl_next(tl_eval(in, tl_first(args)));
+}
+
+tl_object *tl_cf_type(tl_interp *in, tl_object *args) {
+	tl_object *obj = tl_eval(in, tl_first(args));
+	if(tl_has_error(in)) {
+		return in->false_;
+	}
+	/* Check for pairs last, since NULL is a valid pair */
+	if(tl_is_int(obj)) return tl_new_sym("int");
+	if(tl_is_sym(obj)) return tl_new_sym("sym");
+	if(tl_is_cfunc(obj)) return tl_new_sym("cfunc");
+	if(tl_is_func(obj)) return tl_new_sym("func");
+	if(tl_is_macro(obj)) return tl_new_sym("macro");
+	if(tl_is_pair(obj)) return tl_new_sym("pair");
+	return tl_new_sym("unknown");
 }
 
 tl_object *tl_cf_null(tl_interp *in, tl_object *args) {

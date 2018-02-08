@@ -1,3 +1,45 @@
+; Unprefixing
+
+(tl-define define tl-define)
+
+(define #t tl-#t)
+(define #f tl-#f)
+
+(define error tl-error)
+(define lambda tl-lambda)
+(define macro tl-macro)
+(define set! tl-set!)
+(define display tl-display)
+(define if tl-if)
+
+(define + tl-+)
+(define - tl--)
+(define * tl-*)
+(define / tl-/)
+(define % tl-%)
+
+(define = tl-=)
+(define < tl-<)
+
+(define nand tl-nand)
+
+(define cons tl-cons)
+(define car tl-car)
+(define cdr tl-cdr)
+(define type tl-type)
+(define null? tl-null?)
+
+(define apply tl-apply)
+
+(define read tl-read)
+
+; Parser init
+
+(tl-prefix "'" quote)
+(define quote
+  (macro (rest) environ
+		 (car rest)))
+
 ; Essential combinatorics
 
 (define map
@@ -23,11 +65,71 @@
 	(lambda (a b)
 	  (f b a))))
 
+; Mathematics and Logic
+
+(define not
+  (lambda (a)
+	(nand a a)))
+
+(define and
+  (lambda (a b)
+	(not (nand a b))))
+
+(define or
+  (lambda (a b)
+	(nand (not a) (not b))))
+
+(define <=
+  (lambda (a b)
+	(or
+	  (< a b)
+	  (= a b))))
+
+(define >
+  (lambda (a b)
+	(not (<= a b))))
+
+(define >=
+  (lambda (a b)
+	(or
+	  (> a b)
+	  (= a b))))
+
+(define max
+  (lambda (a b)
+	(if (> a b)
+	  a
+	  b)))
+
+(define min
+  (lambda (a b)
+	(if (< a b)
+	  a
+	  b)))
+
+; Core language
+
+(define pair?
+  (lambda (v)
+	(= (type v) 'pair)))
+
+(tl-prefix "," unquote)
+(tl-prefix "`" quasiquote)
+(define quasiquote
+  (macro (rest) environ
+		 (map (lambda (x)
+				(if (pair? x)
+				  (if (= 'unquote (car x))
+					(tl-eval-in environ (car (cdr x)))
+					x)
+				  x))
+			  (car rest))))
+
 ; Silly aliases
 
 (define eval
-  (lambda (e)
-	(eval-in (env) e)))
+  (macro (expr) environ
+		 (tl-eval-in environ expr)))
 
 (define caar
   (lambda (l)
@@ -151,19 +253,19 @@
 
 (define begin
   (macro (rest) environ
-		 (last (map (lambda (x) (eval-in environ x)) rest))))
+		 (last (map (lambda (x) (tl-eval-in environ x)) rest))))
 
 (define list
   (macro (rest) environ
-		 (foldl cons '() (map (lambda (x) (eval-in environ x)) rest))))
+		 (foldl cons '() (map (lambda (x) (tl-eval-in environ x)) rest))))
 
 (define let
   (macro (bindings body) environ
-		 (eval-in environ (cons (cons 'lambda (cons (map car bindings) body)) (map cadr bindings)))))
+		 (tl-eval-in environ (cons (cons 'lambda (cons (map car bindings) body)) (map cadr bindings)))))
 
 (define let*
   (macro (bindings body) environ
-		 (eval-in environ (if (null? bindings)
+		 (tl-eval-in environ (if (null? bindings)
 		   (cons 'begin body)
 		   (cons 'let (cons (cons (car bindings) '()) (cons (cons 'let* (cons (cdr bindings) body)) '())))))))
 
@@ -175,53 +277,11 @@
 
 (define cond
   (macro (clauses) environ
-		 (if (eval-in environ (caar clauses))
-		   (eval-in environ (cons 'begin (cdar clauses)))
-		   (eval-in environ (cons 'cond (cdr clauses))))))
+		 (if (tl-eval-in environ (caar clauses))
+		   (tl-eval-in environ (cons 'begin (cdar clauses)))
+		   (tl-eval-in environ (cons 'cond (cdr clauses))))))
 
 (define else #t)
-
-; Mathematics and Logic
-
-(define not
-  (lambda (a)
-	(nand a a)))
-
-(define and
-  (lambda (a b)
-	(not (nand a b))))
-
-(define or
-  (lambda (a b)
-	(nand (not a) (not b))))
-
-(define <=
-  (lambda (a b)
-	(or
-	  (< a b)
-	  (= a b))))
-
-(define >
-  (lambda (a b)
-	(not (<= a b))))
-
-(define >=
-  (lambda (a b)
-	(or
-	  (> a b)
-	  (= a b))))
-
-(define max
-  (lambda (a b)
-	(if (> a b)
-	  a
-	  b)))
-
-(define min
-  (lambda (a b)
-	(if (< a b)
-	  a
-	  b)))
 
 ; List manipulation
 

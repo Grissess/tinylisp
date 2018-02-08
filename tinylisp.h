@@ -73,6 +73,7 @@ typedef struct tl_interp_s {
 	tl_object *true_;
 	tl_object *false_;
 	tl_object *error;
+	tl_object *prefixes;
 	void *udata;
 	int (*readf)(void *);
 	void (*putbackf)(void *, int);
@@ -94,6 +95,7 @@ tl_object *tl_env_set_local(tl_object *, const char *, tl_object *);
 tl_object *tl_cf_error(tl_interp *, tl_object *);
 tl_object *tl_cf_lambda(tl_interp *, tl_object *);
 tl_object *tl_cf_macro(tl_interp *, tl_object *);
+tl_object *tl_cf_prefix(tl_interp *, tl_object *);
 tl_object *tl_cf_define(tl_interp *, tl_object *);
 tl_object *tl_cf_set(tl_interp *, tl_object *);
 tl_object *tl_cf_env(tl_interp *, tl_object *);
@@ -116,6 +118,7 @@ tl_object *tl_cf_nand(tl_interp *, tl_object *);
 tl_object *tl_cf_cons(tl_interp *, tl_object *);
 tl_object *tl_cf_car(tl_interp *, tl_object *);
 tl_object *tl_cf_cdr(tl_interp *, tl_object *);
+tl_object *tl_cf_type(tl_interp *, tl_object *);
 tl_object *tl_cf_null(tl_interp *, tl_object *);
 
 tl_object *tl_print(tl_interp *, tl_object *);
