@@ -40,6 +40,7 @@ int main() {
 		expr = tl_read(&in, TL_EMPTY_LIST);
 		if(!expr) {
 			printf("Done.\n");
+			tl_interp_cleanup(&in);
 			return 0;
 		}
 		fprintf(stderr, "Read: ");
@@ -55,5 +56,6 @@ int main() {
 		fprintf(stderr, "Value: ");
 		tl_print(&in, val);
 		fprintf(stderr, "\n");
+		tl_gc(&in);
 	}
 }

@@ -26,21 +26,21 @@ tl_object *tl_env_get(tl_object *env, const char *nm) {
 	return NULL;
 }
 
-tl_object *tl_env_set_global(tl_object *env, const char *nm, tl_object *val) {
+tl_object *tl_env_set_global(tl_interp *in, tl_object *env, const char *nm, tl_object *val) {
 	tl_object *kv = tl_env_get(env, nm);
 	if(kv && tl_is_pair(kv)) {
 		kv->next = val;
 	}
 	if(!env) {
-		env = tl_new_pair(TL_EMPTY_LIST, env);
+		env = tl_new_pair(in, TL_EMPTY_LIST, env);
 	}
-	env->first = tl_new_pair(tl_new_pair(tl_new_sym(nm), val), env->first);
+	env->first = tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, nm), val), env->first);
 	return env;
 }
 
-tl_object *tl_env_set_local(tl_object *env, const char *nm, tl_object *val) {
+tl_object *tl_env_set_local(tl_interp *in, tl_object *env, const char *nm, tl_object *val) {
 	if(!env) {
-		env = tl_new_pair(TL_EMPTY_LIST, env);
+		env = tl_new_pair(in, TL_EMPTY_LIST, env);
 	}
 	tl_object *frm = env->first;
 	for(tl_list_iter(frm, kv)) {
@@ -49,6 +49,6 @@ tl_object *tl_env_set_local(tl_object *env, const char *nm, tl_object *val) {
 			return env;
 		}
 	}
-	env->first = tl_new_pair(tl_new_pair(tl_new_sym(nm), val), env->first);
+	env->first = tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, nm), val), env->first);
 	return env;
 }

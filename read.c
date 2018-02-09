@@ -37,12 +37,12 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 							break;
 
 						case ')':
-							return tl_list_rvs(list);
+							return tl_list_rvs(in, list);
 							break;
 
 						default:
 							in->putbackf(in->udata, d);
-							list = tl_new_pair(tl_read(in, TL_EMPTY_LIST), list);
+							list = tl_new_pair(in, tl_read(in, TL_EMPTY_LIST), list);
 							break;
 					}
 				}
@@ -53,7 +53,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 				while(idx < MAX_SYM_LEN && (d = in->readf(in->udata)) != q) {
 					symbuf[idx++] = d;
 				}
-				return tl_new_sym(symbuf);
+				return tl_new_sym(in, symbuf);
 				break;
 
 			default:
@@ -64,26 +64,26 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 						ival += c - '0';
 					}
 					in->putbackf(in->udata, c);
-					return tl_new_int(ival);
+					return tl_new_int(in, ival);
 				}
 				for(tl_list_iter(in->prefixes, kv)) {
 					tl_object *key = tl_first(kv);
 					tl_object *val = tl_next(kv);
 					if(key && val && tl_is_sym(key) && key->str[0] == c) {
 						list = tl_read(in, TL_EMPTY_LIST);
-						return tl_new_pair(val, tl_new_pair(list, TL_EMPTY_LIST));
+						return tl_new_pair(in, val, tl_new_pair(in, list, TL_EMPTY_LIST));
 					}
 				}
 				symbuf[idx++] = c;
 				while(idx < MAX_SYM_LEN) {
 					switch(d = in->readf(in->udata)) {
 						case ' ': case '\n': case '\t': case '\v': case '\r': case '\b':
-							return tl_new_sym(symbuf);
+							return tl_new_sym(in, symbuf);
 							break;
 
 						case '(': case ')':
 							in->putbackf(in->udata, d);
-							return tl_new_sym(symbuf);
+							return tl_new_sym(in, symbuf);
 							break;
 
 						default:
@@ -91,7 +91,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 							break;
 					}
 				}
-				return tl_new_sym(symbuf);
+				return tl_new_sym(in, symbuf);
 				break;
 		}
 	}

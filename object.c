@@ -4,19 +4,26 @@
 
 #include "tinylisp.h"
 
-tl_object *tl_new() {
-	return malloc(sizeof(tl_object));
+tl_object *tl_new(tl_interp *in) {
+	tl_object *obj = malloc(sizeof(tl_object));
+	assert(obj);
+	obj->refcnt = 1;
+	obj->next_alloc = in->top_alloc;
+	obj->prev_alloc = NULL;
+	if(in->top_alloc) in->top_alloc->prev_alloc = obj;
+	in->top_alloc = obj;
+	return obj;
 }
 
-tl_object *tl_new_int(long ival) {
-	tl_object *obj = tl_new();
+tl_object *tl_new_int(tl_interp *in, long ival) {
+	tl_object *obj = tl_new(in);
 	obj->kind = TL_INT;
 	obj->ival = ival;
 	return obj;
 }
 
-tl_object *tl_new_sym(const char *str) {
-	tl_object *obj = tl_new();
+tl_object *tl_new_sym(tl_interp *in, const char *str) {
+	tl_object *obj = tl_new(in);
 	obj->kind = TL_SYM;
 	if(str) {
 		obj->str = strdup(str);
@@ -26,23 +33,23 @@ tl_object *tl_new_sym(const char *str) {
 	return obj;
 }
 
-tl_object *tl_new_pair(tl_object *first, tl_object *next) {
-	tl_object *obj = tl_new();
+tl_object *tl_new_pair(tl_interp *in, tl_object *first, tl_object *next) {
+	tl_object *obj = tl_new(in);
 	obj->kind = TL_PAIR;
-	obj->first = first;
-	obj->next = next;
+	obj->first = tl_incref(first);
+	obj->next = tl_incref(next);
 	return obj;
 }
 
-tl_object *tl_new_cfunc(tl_object *(*cfunc)(tl_interp *, tl_object *)) {
-	tl_object *obj = tl_new();
+tl_object *tl_new_cfunc(tl_interp *in, tl_object *(*cfunc)(tl_interp *, tl_object *)) {
+	tl_object *obj = tl_new(in);
 	obj->kind = TL_CFUNC;
 	obj->cfunc = cfunc;
 	return obj;
 }
 
-tl_object *tl_new_func(tl_object *args, tl_object *body, tl_object *env) {
-	tl_object *obj = tl_new();
+tl_object *tl_new_func(tl_interp *in, tl_object *args, tl_object *body, tl_object *env) {
+	tl_object *obj = tl_new(in);
 	assert(tl_is_pair(args));
 	for(tl_list_iter(args, arg)) {
 		assert(tl_is_sym(arg));
@@ -50,21 +57,31 @@ tl_object *tl_new_func(tl_object *args, tl_object *body, tl_object *env) {
 	assert(tl_is_pair(body));
 	assert(tl_is_pair(env));
 	obj->kind = TL_FUNC;
-	obj->args = args;
-	obj->body = body;
-	obj->env = env;
+	obj->args = tl_incref(args);
+	obj->body = tl_incref(body);
+	obj->env = tl_incref(env);
 	return obj;
 }
 
-tl_object *tl_new_macro(tl_object *args, const char *envn, tl_object *body, tl_object *env) {
-	tl_object *obj = tl_new_func(args, body, env);
+tl_object *tl_new_macro(tl_interp *in, tl_object *args, const char *envn, tl_object *body, tl_object *env) {
+	tl_object *obj = tl_new_func(in, args, body, env);
 	obj->envn = strdup(envn);
 	obj->kind = TL_MACRO;
 	return obj;
 }
 
-void tl_free(tl_object *obj) {
+void tl_free(tl_interp *in, tl_object *obj) {
 	if(!obj) return;
+	if(tl_decref(obj)) return;
+	in->printf(in->udata, "Recycle: %p\n", obj);
+	if(obj->prev_alloc) {
+		obj->prev_alloc->next_alloc = tl_next_alloc(obj);
+	} else {
+		in->top_alloc = tl_next_alloc(obj);
+	}
+	if(tl_next_alloc(obj)) {
+		tl_next_alloc(obj)->prev_alloc = obj->prev_alloc;
+	}
 	switch(obj->kind) {
 		case TL_INT:
 			break;
@@ -74,8 +91,8 @@ void tl_free(tl_object *obj) {
 			break;
 
 		case TL_PAIR:
-			tl_free(obj->first);
-			tl_free(obj->next);
+			tl_free(in, obj->first);
+			tl_free(in, obj->next);
 			break;
 
 		case TL_CFUNC:
@@ -83,9 +100,9 @@ void tl_free(tl_object *obj) {
 
 		case TL_FUNC:
 		case TL_MACRO:
-			tl_free(obj->args);
-			tl_free(obj->body);
-			tl_free(obj->env);
+			tl_free(in, obj->args);
+			tl_free(in, obj->body);
+			tl_free(in, obj->env);
 			if(obj->kind == TL_MACRO) {
 				free(obj->envn);
 			}
@@ -95,6 +112,49 @@ void tl_free(tl_object *obj) {
 			assert(0);
 	}
 	free(obj);
+}
+
+static void _tl_mark_pass(tl_object *obj) {
+	if(!obj) return;
+	if(tl_is_marked(obj)) return;
+	tl_mark(obj);
+	switch(obj->kind) {
+		case TL_INT:
+		case TL_SYM:
+		case TL_CFUNC:
+			break;
+
+		case TL_FUNC:
+		case TL_MACRO:
+			_tl_mark_pass(obj->args);
+			_tl_mark_pass(obj->body);
+			_tl_mark_pass(obj->env);
+			break;
+
+		case TL_PAIR:
+			_tl_mark_pass(obj->first);
+			_tl_mark_pass(obj->next);
+			break;
+
+		default:
+			assert(0);
+	}
+}
+
+void tl_gc(tl_interp *in) {
+	tl_object *obj = in->top_alloc;
+	while(obj) {
+		tl_unmark(obj);
+		obj = tl_next_alloc(obj);
+	}
+	_tl_mark_pass(in->env);
+	obj = in->top_alloc;
+	while(obj) {
+		if(!tl_is_marked(obj)) {
+			tl_free(in, obj);
+		}
+		obj = tl_next_alloc(obj);
+	}
 }
 
 size_t tl_list_len(tl_object *l) {
@@ -108,10 +168,10 @@ size_t tl_list_len(tl_object *l) {
 	return cnt;
 }
 
-tl_object *tl_list_rvs(tl_object *l) {
+tl_object *tl_list_rvs(tl_interp *in, tl_object *l) {
 	tl_object *res = TL_EMPTY_LIST;
 	for(tl_list_iter(l, item)) {
-		res = tl_new_pair(item, res);
+		res = tl_new_pair(in, item, res);
 	}
 	return res;
 }

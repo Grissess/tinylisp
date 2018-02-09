@@ -37,16 +37,34 @@ typedef struct tl_object_s {
 			char *envn;  /* For macros only */
 		};
 	};
+	union {
+		struct tl_object_s *next_alloc;
+		size_t next_alloc_i;
+	};
+	struct tl_object_s *prev_alloc;
+	size_t refcnt;
 } tl_object;
 
-tl_object *tl_new();
-tl_object *tl_new_int(long);
-tl_object *tl_new_sym(const char *);
-tl_object *tl_new_pair(tl_object *, tl_object *);
-tl_object *tl_new_cfunc(tl_object *(*)(tl_interp *, tl_object *));
-tl_object *tl_new_func(tl_object *, tl_object *, tl_object *);
-tl_object *tl_new_macro(tl_object *, const char *, tl_object *, tl_object *);
-void tl_free(tl_object *);
+#define TL_FMASK 0x3
+#define TL_F_MARK 0x1
+
+#define tl_mark(obj) ((obj)->next_alloc_i |= TL_F_MARK)
+#define tl_unmark(obj) ((obj)->next_alloc_i &= ~TL_FMASK)
+#define tl_is_marked(obj) ((obj)->next_alloc_i & TL_F_MARK)
+#define tl_next_alloc(obj) ((tl_object *)((obj)->next_alloc_i & (~TL_FMASK)))
+
+#define tl_incref(obj) ((obj) ? ((obj)->refcnt++, (obj)) : NULL)
+#define tl_decref(obj) (--(obj)->refcnt)
+
+tl_object *tl_new(tl_interp *);
+tl_object *tl_new_int(tl_interp *, long);
+tl_object *tl_new_sym(tl_interp *, const char *);
+tl_object *tl_new_pair(tl_interp *, tl_object *, tl_object *);
+tl_object *tl_new_cfunc(tl_interp *, tl_object *(*)(tl_interp *, tl_object *));
+tl_object *tl_new_func(tl_interp *, tl_object *, tl_object *, tl_object *);
+tl_object *tl_new_macro(tl_interp *, tl_object *, const char *, tl_object *, tl_object *);
+void tl_free(tl_interp *, tl_object *);
+void tl_gc(tl_interp *);
 
 #define tl_is_int(obj) ((obj) && (obj)->kind == TL_INT)
 #define tl_is_sym(obj) ((obj) && (obj)->kind == TL_SYM)
@@ -65,7 +83,7 @@ void tl_free(tl_object *);
 
 #define tl_list_iter(obj, it) tl_object *l_##it = obj, *it = tl_first(obj); l_##it; l_##it = tl_next(l_##it), it = tl_first(l_##it)
 size_t tl_list_len(tl_object *);
-tl_object *tl_list_rvs(tl_object *);
+tl_object *tl_list_rvs(tl_interp *, tl_object *);
 
 typedef struct tl_interp_s {
 	tl_object *top_env;
@@ -74,6 +92,7 @@ typedef struct tl_interp_s {
 	tl_object *false_;
 	tl_object *error;
 	tl_object *prefixes;
+	tl_object *top_alloc;
 	void *udata;
 	int (*readf)(void *);
 	void (*putbackf)(void *, int);
@@ -89,8 +108,8 @@ void tl_interp_cleanup(tl_interp *);
 
 tl_object *tl_env_get_kv(tl_object *, const char *);
 tl_object *tl_env_get(tl_object *, const char *);
-tl_object *tl_env_set_global(tl_object *, const char *, tl_object *);
-tl_object *tl_env_set_local(tl_object *, const char *, tl_object *);
+tl_object *tl_env_set_global(tl_interp *, tl_object *, const char *, tl_object *);
+tl_object *tl_env_set_local(tl_interp *, tl_object *, const char *, tl_object *);
 
 tl_object *tl_cf_error(tl_interp *, tl_object *);
 tl_object *tl_cf_lambda(tl_interp *, tl_object *);
