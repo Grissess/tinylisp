@@ -3,8 +3,6 @@
 
 #include "tinylisp.h"
 
-tl_interp *_global_in;
-
 int my_readf(void *_) {
 	return getchar();
 }
@@ -23,8 +21,6 @@ void my_printf(void *_, const char *fmt, ...) {
 int main() {
 	tl_interp in;
 	tl_object *expr, *val;
-
-	_global_in = &in;
 
 	tl_interp_init(&in);
 	in.readf = my_readf;

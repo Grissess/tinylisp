@@ -47,6 +47,7 @@ void tl_interp_init(tl_interp *in) {
 	top_frm = _tl_frm_set("tl-apply", tl_new_cfunc(in, tl_cf_apply), top_frm);
 
 	top_frm = _tl_frm_set("tl-read", tl_new_cfunc(in, tl_read), top_frm);
+	top_frm = _tl_frm_set("tl-gc", tl_new_cfunc(in, tl_cf_gc), top_frm);
 
 #ifdef DEBUG
 	top_frm = _tl_frm_set("tl-debug-print", tl_new_cfunc(in, tl_cf_debug_print), top_frm);
@@ -58,7 +59,6 @@ void tl_interp_init(tl_interp *in) {
 
 void tl_interp_cleanup(tl_interp *in) {
 	while(in->top_alloc) {
-		//in->printf(in->udata, "Visit: %p\n", in->top_alloc);
 		tl_free(in, in->top_alloc);
 	}
 }

@@ -42,7 +42,6 @@ typedef struct tl_object_s {
 		size_t next_alloc_i;
 	};
 	struct tl_object_s *prev_alloc;
-	size_t refcnt;
 } tl_object;
 
 #define TL_FMASK 0x3
@@ -52,9 +51,7 @@ typedef struct tl_object_s {
 #define tl_unmark(obj) ((obj)->next_alloc_i &= ~TL_FMASK)
 #define tl_is_marked(obj) ((obj)->next_alloc_i & TL_F_MARK)
 #define tl_next_alloc(obj) ((tl_object *)((obj)->next_alloc_i & (~TL_FMASK)))
-
-#define tl_incref(obj) ((obj) ? ((obj)->refcnt++, (obj)) : NULL)
-#define tl_decref(obj) (--(obj)->refcnt)
+#define tl_make_next_alloc(orig, ptr) ((tl_object *)(((obj)->next_alloc_i & (~TL_FMASK)) | (((size_t)(orig)) & TL_FMASK)))
 
 tl_object *tl_new(tl_interp *);
 tl_object *tl_new_int(tl_interp *, long);
@@ -149,6 +146,7 @@ tl_object *tl_cf_evalin(tl_interp *, tl_object *);
 tl_object *tl_cf_apply(tl_interp *, tl_object *);
 
 tl_object *tl_read(tl_interp *, tl_object *);
+tl_object *tl_cf_gc(tl_interp *, tl_object *);
 
 #ifdef DEBUG
 void tl_dbg_print(tl_object *, int);

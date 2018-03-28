@@ -309,3 +309,8 @@ tl_object *tl_cf_apply(tl_interp *in, tl_object *args) {
 	}
 	return tl_apply(in, tl_list_rvs(in, list));
 }
+
+tl_object *tl_cf_gc(tl_interp *in, tl_object *args) {
+	tl_gc(in);
+	return in->true_;
+}

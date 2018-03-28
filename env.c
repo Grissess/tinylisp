@@ -3,8 +3,6 @@
 
 #include "tinylisp.h"
 
-extern tl_interp *_global_in;
-
 tl_object *tl_env_get_kv(tl_object *env, const char *nm) {
 	for(tl_list_iter(env, frame)) {
 		for(tl_list_iter(frame, kv)) {
