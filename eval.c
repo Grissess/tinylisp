@@ -59,6 +59,9 @@ void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, void *_cont)
 	env = tl_new_pair(in, frm, callex->env);
 	for(tl_list_iter(tl_list_rvs(in, callex->body), ex)) {
 		tl_push_apply(in, TL_APPLY_PUSH_ONLY, ex, env);
+		if(tl_next(l_ex)) {  /* Drop the next ex from the stack */
+			tl_push_apply(in, TL_APPLY_DROP, TL_EMPTY_LIST, TL_EMPTY_LIST);
+		}
 	}
 }
 
@@ -83,6 +86,10 @@ int tl_apply_next(tl_interp *in) {
 	tl_print(in, callex);
 	in->printf(in->udata, " ");
 	*/
+	if(len == TL_APPLY_DROP) {
+		in->values = tl_next(in->values);
+		return 1;
+	}
 	if(len != TL_APPLY_INDIRECT) {
 		if(tl_push_eval(in, callex, env) && len != TL_APPLY_PUSH_ONLY) {
 			/* in->printf(in->udata, "[indirected]\n"); */
