@@ -18,6 +18,18 @@ void my_printf(void *_, const char *fmt, ...) {
 	va_end(ap);
 }
 
+void _main_k(tl_interp *in, tl_object *result, void *_) {
+	fprintf(stderr, "Value: ");
+	tl_print(in, tl_first(result));
+	fprintf(stderr, "\n");
+	if(in->values) {
+		fprintf(stderr, "(Rest of stack: ");
+		tl_print(in, in->values);
+		fprintf(stderr, ")\n");
+	}
+	tl_cfunc_return(in, in->true_);
+}
+
 int main() {
 	tl_interp in;
 	tl_object *expr, *val;
@@ -42,16 +54,16 @@ int main() {
 		fprintf(stderr, "Read: ");
 		tl_print(&in, expr);
 		fprintf(stderr, "\n");
-		val = tl_eval(&in, expr);
+		tl_eval_and_then(&in, expr, NULL, _main_k);
+		tl_run_until_done(&in);
 		if(in.error) {
 			fprintf(stderr, "Error: ");
 			tl_print(&in, in.error);
 			fprintf(stderr, "\n");
 			tl_error_clear(&in);
 		}
-		fprintf(stderr, "Value: ");
-		tl_print(&in, val);
-		fprintf(stderr, "\n");
+		in.conts = TL_EMPTY_LIST;
+		in.values = TL_EMPTY_LIST;  /* Expected: (tl-#t) due to _main_k */
 		tl_gc(&in);
 	}
 }

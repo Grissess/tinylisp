@@ -44,16 +44,12 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			break;
 
 		case TL_CFUNC:
-			in->printf(in->udata, "cfunc:%p", obj->cfunc);
+			in->printf(in->udata, "%s:%p", obj->name ? obj->name : "<cfunc>", obj->cfunc);
 			break;
 
-		case TL_FUNC:
 		case TL_MACRO:
-			if(tl_is_macro(obj)) {
-				in->printf(in->udata, "(macro ");
-			} else {
-				in->printf(in->udata, "(lambda ");
-			}
+		case TL_FUNC:
+			in->printf(in->udata, "(%s ", obj->kind == TL_MACRO ? "macro" : "lambda");
 			tl_print(in, obj->args);
 			in->printf(in->udata, " ");
 			if(tl_is_macro(obj)) {
@@ -61,6 +57,10 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			}
 			_print_pairs(in, obj->body);
 			in->printf(in->udata, ")");
+			break;
+
+		case TL_CONT:
+			in->printf(in->udata, "cont:%p", obj);
 			break;
 
 		default:

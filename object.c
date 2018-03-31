@@ -40,32 +40,31 @@ tl_object *tl_new_pair(tl_interp *in, tl_object *first, tl_object *next) {
 	return obj;
 }
 
-tl_object *tl_new_cfunc(tl_interp *in, tl_object *(*cfunc)(tl_interp *, tl_object *)) {
+tl_object *tl_new_then(tl_interp *in, void (*cfunc)(tl_interp *, tl_object *, void *), void *state, const char *name) {
 	tl_object *obj = tl_new(in);
 	obj->kind = TL_CFUNC;
 	obj->cfunc = cfunc;
-	return obj;
-}
-
-tl_object *tl_new_func(tl_interp *in, tl_object *args, tl_object *body, tl_object *env) {
-	tl_object *obj = tl_new(in);
-	assert(tl_is_pair(args));
-	for(tl_list_iter(args, arg)) {
-		assert(tl_is_sym(arg));
-	}
-	assert(tl_is_pair(body));
-	assert(tl_is_pair(env));
-	obj->kind = TL_FUNC;
-	obj->args = args;
-	obj->body = body;
-	obj->env = env;
+	obj->state = state;
+	obj->name = name ? strdup(name) : NULL;
 	return obj;
 }
 
 tl_object *tl_new_macro(tl_interp *in, tl_object *args, const char *envn, tl_object *body, tl_object *env) {
-	tl_object *obj = tl_new_func(in, args, body, env);
-	obj->envn = strdup(envn);
-	obj->kind = TL_MACRO;
+	tl_object *obj = tl_new(in);
+	obj->kind = envn ? TL_MACRO : TL_FUNC;
+	obj->args = args;
+	obj->body = body;
+	obj->env = env;
+	obj->envn = envn ? strdup(envn) : NULL;
+	return obj;
+}
+
+tl_object *tl_new_cont(tl_interp *in, tl_object *env, tl_object *cont, tl_object *values) {
+	tl_object *obj = tl_new(in);
+	obj->kind = TL_CONT;
+	obj->ret_env = env;
+	obj->ret_cont = cont;
+	obj->ret_values = values;
 	return obj;
 }
 
@@ -84,6 +83,19 @@ void tl_free(tl_interp *in, tl_object *obj) {
 	}
 	if(tl_next_alloc(obj)) {
 		tl_next_alloc(obj)->prev_alloc = obj->prev_alloc;
+	}
+	switch(obj->kind) {
+		case TL_SYM:
+			free(obj->str);
+			break;
+
+		case TL_MACRO:
+			free(obj->envn);
+			break;
+
+		case TL_CFUNC:
+			free(obj->name);
+			break;
 	}
 	free(obj);
 }
@@ -110,6 +122,12 @@ static void _tl_mark_pass(tl_object *obj) {
 			_tl_mark_pass(obj->next);
 			break;
 
+		case TL_CONT:
+			_tl_mark_pass(obj->ret_env);
+			_tl_mark_pass(obj->ret_cont);
+			_tl_mark_pass(obj->ret_values);
+			break;
+
 		default:
 			assert(0);
 	}
@@ -128,6 +146,8 @@ void tl_gc(tl_interp *in) {
 	_tl_mark_pass(in->prefixes);
 	_tl_mark_pass(in->env);
 	_tl_mark_pass(in->top_env);
+	_tl_mark_pass(in->conts);
+	_tl_mark_pass(in->values);
 	obj = in->top_alloc;
 	while(obj) {
 		tmp = obj;

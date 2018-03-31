@@ -40,13 +40,16 @@ tl_object *tl_env_set_local(tl_interp *in, tl_object *env, const char *nm, tl_ob
 	if(!env) {
 		env = tl_new_pair(in, TL_EMPTY_LIST, env);
 	}
-	tl_object *frm = env->first;
+	env->first = tl_frm_set(in, tl_first(env), nm, val);
+	return env;
+}
+
+tl_object *tl_frm_set(tl_interp *in, tl_object *frm, const char *nm, tl_object *val) {
 	for(tl_list_iter(frm, kv)) {
 		if(kv && tl_is_pair(kv) && tl_is_sym(tl_first(kv)) && !strcmp(tl_first(kv)->str, nm)) {
 			kv->next = val;
-			return env;
+			return frm;
 		}
 	}
-	env->first = tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, nm), val), env->first);
-	return env;
+	return tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, nm), val), frm);
 }

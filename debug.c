@@ -39,16 +39,16 @@ void tl_dbg_print(tl_object *obj, int level) {
 			fprintf(stderr, "CFUNC: %p\n", obj->cfunc);
 			break;
 
-		case TL_FUNC:
 		case TL_MACRO:
-			if(obj->kind == TL_FUNC) {
-				fprintf(stderr, "FUNC:\n");
-			} else {
-				fprintf(stderr, "MACRO:\n");
-			}
+		case TL_FUNC:
+			fprintf(stderr, "%s:\n", obj->kind == TL_MACRO ? "MACRO" : "FUNC");
 			_indent(level + 1);
 			fprintf(stderr, "args:\n");
 			tl_dbg_print(obj->args, level + 2);
+			if(obj->kind == TL_MACRO) {
+				_indent(level + 1);
+				fprintf(stderr, "envn: %s\n", obj->envn);
+			}
 			_indent(level + 1);
 			fprintf(stderr, "body:\n");
 			tl_dbg_print(obj->body, level + 2);
@@ -57,18 +57,33 @@ void tl_dbg_print(tl_object *obj, int level) {
 			tl_dbg_print(obj->env, level + 2);
 			break;
 
+		case TL_CONT:
+			fprintf(stderr, "CONTINUATION:\n");
+			_indent(level + 1);
+			fprintf(stderr, "ret_cont:\n");
+			tl_dbg_print(obj->ret_cont, level + 2);
+			_indent(level + 1);
+			fprintf(stderr, "ret_values:\n");
+			tl_dbg_print(obj->ret_values, level + 2);
+			_indent(level + 1);
+			fprintf(stderr, "ret_env:\n");
+			tl_dbg_print(obj->ret_env, level + 2);
+			break;
+
 		default:
 			fprintf(stderr, "!!! UNKNOWN OBJECT KIND %d\n", obj->kind);
 			break;
 	}
 }
 
-tl_object *tl_cf_debug_print(tl_interp *in, tl_object *obj) {
+void tl_cf_debug_print(tl_interp *in, tl_object *obj, void *_) {
 	fprintf(stderr, "EXPR:\n");
 	tl_dbg_print(tl_first(obj), 0);
+	/*
 	obj = tl_eval(in, tl_first(obj));
 	fprintf(stderr, "VALUE:\n");
 	tl_dbg_print(obj, 0);
-	return in->true_;
+	*/
+	tl_cfunc_return(in, in->true_);
 }
 #endif

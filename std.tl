@@ -29,7 +29,9 @@
 (define type tl-type)
 (define null? tl-null?)
 
-(define apply tl-apply)
+;(define apply tl-apply)
+(define call-with-current-continuation tl-call-with-current-continuation)
+(define call/cc call-with-current-continuation)
 
 (define read tl-read)
 
@@ -39,6 +41,11 @@
 (define quote
   (macro (rest) environ
 		 (car rest)))
+
+; Continuation compatibility
+(define tl-eval-in
+  (lambda (env ex)
+	(call/cc (lambda (ret) (tl-eval-in& env ex ret)))))
 
 ; Essential combinatorics
 
