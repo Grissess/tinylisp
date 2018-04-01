@@ -1,4 +1,6 @@
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "tinylisp.h"
 
@@ -233,6 +235,34 @@ void tl_cf_setenv(tl_interp *in, tl_object *args, void *_) {
 
 void tl_cf_topenv(tl_interp *in, tl_object *args, void *_) {
 	tl_cfunc_return(in, in->top_env);
+}
+
+void _tl_cf_concat_k(tl_interp *in, tl_object *args, void *_) {
+	char *buffer = "", *new_buffer;
+	char *orig_buffer = buffer;
+	size_t sz;
+	for(tl_list_iter(args, val)) {
+		verify_type(in, val, sym, "concat");
+		sz = snprintf(NULL, 0, "%s%s", buffer, val->str);
+		new_buffer = malloc(sz + 1);
+		snprintf(new_buffer, sz + 1, "%s%s", buffer, val->str);
+		if(buffer != orig_buffer) free(buffer);
+		buffer = new_buffer;
+	}
+	tl_cfunc_return(in, tl_new_sym(in, buffer));
+}
+
+void tl_cf_concat(tl_interp *in, tl_object *args, void *_) {
+	tl_eval_all_args(in, args, NULL, _tl_cf_concat_k);
+}
+
+void _tl_cf_length_k(tl_interp *in, tl_object *result, void *_) {
+	verify_type(in, tl_first(result), sym, "length");
+	tl_cfunc_return(in, tl_new_int(in, strlen(tl_first(result)->str)));
+}
+
+void tl_cf_length(tl_interp *in, tl_object *args, void *_) {
+	tl_eval_and_then(in, tl_first(args), NULL, _tl_cf_length_k);
 }
 
 void _tl_cf_add_k(tl_interp *in, tl_object *args, void *_) {

@@ -141,6 +141,9 @@ void tl_cf_cdr(tl_interp *, tl_object *, void *);
 void tl_cf_null(tl_interp *, tl_object *, void *);
 void tl_cf_if(tl_interp *, tl_object *, void *);
 
+void tl_cf_concat(tl_interp *, tl_object *, void *);
+void tl_cf_length(tl_interp *, tl_object *, void *);
+
 void tl_cf_add(tl_interp *, tl_object *, void *);
 void tl_cf_sub(tl_interp *, tl_object *, void *);
 void tl_cf_mul(tl_interp *, tl_object *, void *);

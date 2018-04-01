@@ -34,6 +34,9 @@ void tl_interp_init(tl_interp *in) {
 	top_frm = _tl_frm_set("tl-null?", tl_new_cfunc(in, tl_cf_null), top_frm);
 	top_frm = _tl_frm_set("tl-if", tl_new_cfunc(in, tl_cf_if), top_frm);
 
+	top_frm = _tl_frm_set("tl-concat", tl_new_cfunc(in, tl_cf_concat), top_frm);
+	top_frm = _tl_frm_set("tl-length", tl_new_cfunc(in, tl_cf_length), top_frm);
+
 	top_frm = _tl_frm_set("tl-+", tl_new_cfunc(in, tl_cf_add), top_frm);
 	top_frm = _tl_frm_set("tl--", tl_new_cfunc(in, tl_cf_sub), top_frm);
 	top_frm = _tl_frm_set("tl-*", tl_new_cfunc(in, tl_cf_mul), top_frm);

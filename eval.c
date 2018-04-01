@@ -124,9 +124,13 @@ int tl_apply_next(tl_interp *in) {
 	in->printf(in->udata, "\n");
 	*/
 	if(len == TL_APPLY_DROP_EVAL) return 1;
-	if(len == TL_APPLY_PUSH_EVAL || !tl_is_callable(callex)) {
+	if(len == TL_APPLY_PUSH_EVAL) {
 		tl_values_push(in, callex);
 		return 1;
+	}
+	if(!tl_is_callable(callex)) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "call non-callable"), callex));
+		return 0;
 	}
 	for(int i = 0; i < len; i++) {
 		args = tl_new_pair(in, tl_first(in->values), args);
