@@ -163,6 +163,7 @@ int tl_push_eval(tl_interp *, tl_object *, tl_object *);
 #define TL_APPLY_PUSH_EVAL -1
 #define TL_APPLY_INDIRECT -2
 #define TL_APPLY_DROP_EVAL -3
+#define TL_APPLY_DROP -4
 void tl_push_apply(tl_interp *, long, tl_object *, tl_object *);
 int tl_apply_next(tl_interp *);
 void _tl_eval_and_then(tl_interp *, tl_object *, void *, void (*)(tl_interp *, tl_object *, void *), const char *);

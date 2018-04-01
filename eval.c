@@ -84,13 +84,24 @@ int tl_apply_next(tl_interp *in) {
 	tl_print(in, callex);
 	in->printf(in->udata, " ");
 	*/
+	if(len == TL_APPLY_DROP) {
+		in->values = tl_next(in->values);
+		return 1;
+	}
 	if(len != TL_APPLY_INDIRECT) {
-		if(tl_push_eval(in, callex, env) && len != TL_APPLY_PUSH_EVAL && len != TL_APPLY_DROP_EVAL) {
-			/* in->printf(in->udata, "[indirected]\n"); */
-			cont = tl_first(in->conts);
-			in->conts = tl_next(in->conts);
-			tl_push_apply(in, TL_APPLY_INDIRECT, tl_new_int(in, len), env);
-			in->conts = tl_new_pair(in, cont, in->conts);
+		if(tl_push_eval(in, callex, env)) {
+			if(!(len == TL_APPLY_PUSH_EVAL || len == TL_APPLY_DROP_EVAL)) {
+				/* in->printf(in->udata, "[indirected]\n"); */
+				cont = tl_first(in->conts);
+				in->conts = tl_next(in->conts);
+				tl_push_apply(in, TL_APPLY_INDIRECT, tl_new_int(in, len), env);
+				in->conts = tl_new_pair(in, cont, in->conts);
+			} else if(len == TL_APPLY_DROP_EVAL) {
+				cont = tl_first(in->conts);
+				in->conts = tl_next(in->conts);
+				tl_push_apply(in, TL_APPLY_DROP, TL_EMPTY_LIST, TL_EMPTY_LIST);
+				in->conts = tl_new_pair(in, cont, in->conts);
+			}
 			return 1;
 		}
 	} else {
@@ -137,6 +148,10 @@ int tl_apply_next(tl_interp *in) {
 			break;
 
 		case TL_CONT:
+			if(len != 1) {
+				tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "bad cont arity (1)"), args));
+				return 0;
+			}
 			in->conts = callex->ret_cont;
 			in->values = callex->ret_values;
 			in->env = callex->ret_env;
