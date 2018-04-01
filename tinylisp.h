@@ -160,9 +160,9 @@ tl_object *tl_print(tl_interp *, tl_object *);
 } while(0)
 #define tl_cfunc_return(in, v) do { tl_values_push((in), (v)); return; } while(0)
 int tl_push_eval(tl_interp *, tl_object *, tl_object *);
-#define TL_APPLY_PUSH_ONLY -1
+#define TL_APPLY_PUSH_EVAL -1
 #define TL_APPLY_INDIRECT -2
-#define TL_APPLY_DROP -3
+#define TL_APPLY_DROP_EVAL -3
 void tl_push_apply(tl_interp *, long, tl_object *, tl_object *);
 int tl_apply_next(tl_interp *);
 void _tl_eval_and_then(tl_interp *, tl_object *, void *, void (*)(tl_interp *, tl_object *, void *), const char *);

@@ -57,11 +57,9 @@ void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, void *_cont)
 	}
 	if(callex->envn) frm = tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, callex->envn), env), frm);
 	env = tl_new_pair(in, frm, callex->env);
-	for(tl_list_iter(tl_list_rvs(in, callex->body), ex)) {
-		tl_push_apply(in, TL_APPLY_PUSH_ONLY, ex, env);
-		if(tl_next(l_ex)) {  /* Drop the next ex from the stack */
-			tl_push_apply(in, TL_APPLY_DROP, TL_EMPTY_LIST, TL_EMPTY_LIST);
-		}
+	tl_object *body_rvs = tl_list_rvs(in, callex->body);
+	for(tl_list_iter(body_rvs, ex)) {
+		tl_push_apply(in, ex == tl_first(body_rvs) ? TL_APPLY_PUSH_EVAL : TL_APPLY_DROP_EVAL, ex, env);
 	}
 }
 
@@ -86,12 +84,8 @@ int tl_apply_next(tl_interp *in) {
 	tl_print(in, callex);
 	in->printf(in->udata, " ");
 	*/
-	if(len == TL_APPLY_DROP) {
-		in->values = tl_next(in->values);
-		return 1;
-	}
 	if(len != TL_APPLY_INDIRECT) {
-		if(tl_push_eval(in, callex, env) && len != TL_APPLY_PUSH_ONLY) {
+		if(tl_push_eval(in, callex, env) && len != TL_APPLY_PUSH_EVAL && len != TL_APPLY_DROP_EVAL) {
 			/* in->printf(in->udata, "[indirected]\n"); */
 			cont = tl_first(in->conts);
 			in->conts = tl_next(in->conts);
@@ -118,7 +112,8 @@ int tl_apply_next(tl_interp *in) {
 	}
 	in->printf(in->udata, "\n");
 	*/
-	if(len == TL_APPLY_PUSH_ONLY || !tl_is_callable(callex)) {
+	if(len == TL_APPLY_DROP_EVAL) return 1;
+	if(len == TL_APPLY_PUSH_EVAL || !tl_is_callable(callex)) {
 		tl_values_push(in, callex);
 		return 1;
 	}
