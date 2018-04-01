@@ -2,6 +2,8 @@
 
 #include "tinylisp.h"
 
+#define QUOTED_SYM_CHARS "0123456789.,'\"`"
+
 void _print_pairs(tl_interp *in, tl_object *cur) {
 	while(cur) {
 		if(!tl_is_pair(cur)) {
@@ -30,7 +32,7 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			break;
 
 		case TL_SYM:
-			if(strchr(obj->str, ' ') || strlen(obj->str) == 0) {
+			if(strpbrk(obj->str, QUOTED_SYM_CHARS) || strlen(obj->str) == 0) {
 				in->printf(in->udata, "\"%s\"", obj->str);
 			} else {
 				in->printf(in->udata, "%s", obj->str);
