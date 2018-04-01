@@ -94,7 +94,7 @@ void tl_gc(tl_interp *);
 size_t tl_list_len(tl_object *);
 tl_object *tl_list_rvs(tl_interp *, tl_object *);
 
-typedef struct tl_interp_s {
+struct tl_interp_s {
 	tl_object *top_env;
 	tl_object *env;
 	tl_object *true_;
@@ -108,7 +108,7 @@ typedef struct tl_interp_s {
 	int (*readf)(void *);
 	void (*putbackf)(void *, int);
 	void (*printf)(void *, const char *, ...);
-} tl_interp;
+};
 
 void tl_interp_init(tl_interp *);
 void tl_interp_cleanup(tl_interp *);
