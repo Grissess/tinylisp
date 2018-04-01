@@ -16,3 +16,5 @@ install: tl
 
 tl: $(OBJ)
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
+
+$(OBJ): tinylisp.h
