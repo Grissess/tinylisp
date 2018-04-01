@@ -96,6 +96,9 @@ void tl_free(tl_interp *in, tl_object *obj) {
 		case TL_CFUNC:
 			free(obj->name);
 			break;
+
+		default:
+			break;
 	}
 	free(obj);
 }
