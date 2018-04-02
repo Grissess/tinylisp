@@ -52,9 +52,11 @@ void tl_dbg_print(tl_object *obj, int level) {
 			_indent(level + 1);
 			fprintf(stderr, "body:\n");
 			tl_dbg_print(obj->body, level + 2);
+			/*
 			_indent(level + 1);
 			fprintf(stderr, "env:\n");
 			tl_dbg_print(obj->env, level + 2);
+			*/
 			break;
 
 		case TL_CONT:
@@ -65,9 +67,11 @@ void tl_dbg_print(tl_object *obj, int level) {
 			_indent(level + 1);
 			fprintf(stderr, "ret_values:\n");
 			tl_dbg_print(obj->ret_values, level + 2);
+			/*
 			_indent(level + 1);
 			fprintf(stderr, "ret_env:\n");
 			tl_dbg_print(obj->ret_env, level + 2);
+			*/
 			break;
 
 		default:
@@ -76,14 +80,15 @@ void tl_dbg_print(tl_object *obj, int level) {
 	}
 }
 
+void _tl_cf_debug_print_k(tl_interp *in, tl_object *result, void *_) {
+	fprintf(stderr, "VALUE:\n");
+	tl_dbg_print(tl_first(result), 0);
+	tl_cfunc_return(in, in->true_);
+}
+
 void tl_cf_debug_print(tl_interp *in, tl_object *obj, void *_) {
 	fprintf(stderr, "EXPR:\n");
 	tl_dbg_print(tl_first(obj), 0);
-	/*
-	obj = tl_eval(in, tl_first(obj));
-	fprintf(stderr, "VALUE:\n");
-	tl_dbg_print(obj, 0);
-	*/
-	tl_cfunc_return(in, in->true_);
+	tl_eval_and_then(in, tl_first(obj), NULL, _tl_cf_debug_print_k);
 }
 #endif
