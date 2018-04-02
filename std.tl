@@ -259,7 +259,9 @@
   (lambda (l)
 	(if (null? (cdr l))
 	  (car l)
-	  (last (cdr l)))))
+	  (if (pair? (cdr l))
+		(last (cdr l))
+		(cdr l)))))
 
 (define begin
   (macro (rest) environ

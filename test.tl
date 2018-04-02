@@ -13,3 +13,8 @@
 (define f (lambda (ret) (ret 2) 4))
 (f (lambda (x) x))
 (call/cc f)
+(define mkpair (lambda (a b) (lambda (x) (if x a b))))
+(define l (mkpair 1 (mkpair 2 (mkpair 3 #f))))
+(l #t)
+((l #f) #t)
+(((l #f) #f) #t)

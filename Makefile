@@ -9,7 +9,7 @@ CC := gcc
 all: tl
 
 clean:
-	rm $(OBJ)
+	rm $(OBJ) tl
 
 install: tl
 	install -D -t $(DESTDIR)/bin/ $?
