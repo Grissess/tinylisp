@@ -184,17 +184,14 @@ void _tl_cf_set_k(tl_interp *in, tl_object *result, void *nm) {
 void tl_cf_set(tl_interp *in, tl_object *args, void *_) {
 	tl_object *key = tl_first(args), *val = tl_first(tl_next(args));
 	arity_n(in, args, 2, "set");
-	if(!tl_is_sym(key)) {
-		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "Define non-sym"), key));
-		tl_cfunc_return(in, in->false_);
-	}
-	tl_eval_and_then(in, val, in->env, _tl_cf_set_k);
+	verify_type(in, key, sym, "set!");
+	tl_eval_and_then(in, val, key->str, _tl_cf_set_k);
 }
 
 void _tl_cf_env_k(tl_interp *in, tl_object *result, void *_) {
 	tl_object *f = tl_first(result);
-	if(!tl_is_macro(f)) {
-		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "Env of non-func or -macro"), f));
+	if(!(tl_is_macro(f) || tl_is_func(f))) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "env of non-func or -macro"), f));
 		tl_cfunc_return(in, in->false_);
 	}
 	tl_cfunc_return(in, f->env);
@@ -216,7 +213,7 @@ void _tl_cf_setenv_global_k(tl_interp *in, tl_object *result, void *_) {
 void _tl_cf_setenv_k(tl_interp *in, tl_object *args, void *_) {
 	tl_object *first = tl_first(args), *next = tl_first(tl_next(args));
 	if(!(tl_is_macro(first) || tl_is_func(first))) {
-		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "Setenv on non-func or -macro"), first));
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "setenv on non-func or -macro"), first));
 		tl_cfunc_return(in, in->false_);
 	}
 	first->env = next;

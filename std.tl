@@ -47,6 +47,9 @@
   (lambda (env ex)
 	(call/cc (lambda (ret) (tl-eval-in& env ex ret)))))
 
+(define current-continuation
+  (lambda () (call/cc (lambda (cc) (cc cc)))))
+
 ; Essential combinatorics
 
 (define map

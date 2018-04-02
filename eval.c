@@ -159,7 +159,7 @@ int tl_apply_next(tl_interp *in) {
 			in->conts = callex->ret_cont;
 			in->values = callex->ret_values;
 			in->env = callex->ret_env;
-			tl_push_eval(in, tl_first(args), in->env);
+			tl_push_eval(in, tl_first(args), env);
 			break;
 
 		default:

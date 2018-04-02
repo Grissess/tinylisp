@@ -118,7 +118,6 @@ void tl_interp_cleanup(tl_interp *);
 #define tl_has_error(in) ((in)->error)
 
 tl_object *tl_env_get_kv(tl_object *, const char *);
-tl_object *tl_env_get(tl_object *, const char *);
 tl_object *tl_env_set_global(tl_interp *, tl_object *, const char *, tl_object *);
 tl_object *tl_env_set_local(tl_interp *, tl_object *, const char *, tl_object *);
 tl_object *tl_frm_set(tl_interp *, tl_object *, const char *, tl_object *);

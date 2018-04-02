@@ -16,18 +16,11 @@ tl_object *tl_env_get_kv(tl_object *env, const char *nm) {
 	return NULL;
 }
 
-tl_object *tl_env_get(tl_object *env, const char *nm) {
+tl_object *tl_env_set_global(tl_interp *in, tl_object *env, const char *nm, tl_object *val) {
 	tl_object *kv = tl_env_get_kv(env, nm);
 	if(kv && tl_is_pair(kv)) {
-		return tl_next(kv);
-	}
-	return NULL;
-}
-
-tl_object *tl_env_set_global(tl_interp *in, tl_object *env, const char *nm, tl_object *val) {
-	tl_object *kv = tl_env_get(env, nm);
-	if(kv && tl_is_pair(kv)) {
 		kv->next = val;
+		return env;
 	}
 	if(!env) {
 		env = tl_new_pair(in, TL_EMPTY_LIST, env);
