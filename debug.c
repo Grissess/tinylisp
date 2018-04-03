@@ -62,8 +62,8 @@ void tl_dbg_print(tl_object *obj, int level) {
 		case TL_CONT:
 			fprintf(stderr, "CONTINUATION:\n");
 			_indent(level + 1);
-			fprintf(stderr, "ret_cont:\n");
-			tl_dbg_print(obj->ret_cont, level + 2);
+			fprintf(stderr, "ret_conts:\n");
+			tl_dbg_print(obj->ret_conts, level + 2);
 			_indent(level + 1);
 			fprintf(stderr, "ret_values:\n");
 			tl_dbg_print(obj->ret_values, level + 2);
@@ -80,13 +80,13 @@ void tl_dbg_print(tl_object *obj, int level) {
 	}
 }
 
-void _tl_cf_debug_print_k(tl_interp *in, tl_object *result, void *_) {
+void _tl_cf_debug_print_k(tl_interp *in, tl_object *result, tl_object *_) {
 	fprintf(stderr, "VALUE:\n");
 	tl_dbg_print(tl_first(result), 0);
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cf_debug_print(tl_interp *in, tl_object *obj, void *_) {
+void tl_cf_debug_print(tl_interp *in, tl_object *obj, tl_object *_) {
 	fprintf(stderr, "EXPR:\n");
 	tl_dbg_print(tl_first(obj), 0);
 	tl_eval_and_then(in, tl_first(obj), NULL, _tl_cf_debug_print_k);

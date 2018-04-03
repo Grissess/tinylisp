@@ -5,12 +5,12 @@ LDFLAGS :=
 DESTDIR := /usr/local/
 CC := gcc
 
-.PHONY: all clean run
+.PHONY: all clean run dist
 
 all: tl
 
 run: tl 
-	cat std.tl - | ./tl
+	cat std.tl - | $(DEBUGGER) ./tl
 
 dist: tinylisp.tar.xz
 

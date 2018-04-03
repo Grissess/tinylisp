@@ -40,7 +40,7 @@ tl_object *tl_new_pair(tl_interp *in, tl_object *first, tl_object *next) {
 	return obj;
 }
 
-tl_object *tl_new_then(tl_interp *in, void (*cfunc)(tl_interp *, tl_object *, void *), void *state, const char *name) {
+tl_object *tl_new_then(tl_interp *in, void (*cfunc)(tl_interp *, tl_object *, tl_object *), tl_object *state, const char *name) {
 	tl_object *obj = tl_new(in);
 	obj->kind = TL_CFUNC;
 	obj->cfunc = cfunc;
@@ -59,11 +59,11 @@ tl_object *tl_new_macro(tl_interp *in, tl_object *args, const char *envn, tl_obj
 	return obj;
 }
 
-tl_object *tl_new_cont(tl_interp *in, tl_object *env, tl_object *cont, tl_object *values) {
+tl_object *tl_new_cont(tl_interp *in, tl_object *env, tl_object *conts, tl_object *values) {
 	tl_object *obj = tl_new(in);
 	obj->kind = TL_CONT;
 	obj->ret_env = env;
-	obj->ret_cont = cont;
+	obj->ret_conts = conts;
 	obj->ret_values = values;
 	return obj;
 }
@@ -110,7 +110,10 @@ static void _tl_mark_pass(tl_object *obj) {
 	switch(obj->kind) {
 		case TL_INT:
 		case TL_SYM:
+			break;
+
 		case TL_CFUNC:
+			_tl_mark_pass(obj->state);
 			break;
 
 		case TL_FUNC:
@@ -127,7 +130,7 @@ static void _tl_mark_pass(tl_object *obj) {
 
 		case TL_CONT:
 			_tl_mark_pass(obj->ret_env);
-			_tl_mark_pass(obj->ret_cont);
+			_tl_mark_pass(obj->ret_conts);
 			_tl_mark_pass(obj->ret_values);
 			break;
 

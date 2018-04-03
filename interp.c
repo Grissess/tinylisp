@@ -9,6 +9,8 @@ void tl_interp_init(tl_interp *in) {
 	in->prefixes = TL_EMPTY_LIST;
 	in->conts = TL_EMPTY_LIST;
 	in->values = TL_EMPTY_LIST;
+	in->gc_events = 65536;
+	in->ctr_events = 0;
 
 	in->top_env = TL_EMPTY_LIST;
 

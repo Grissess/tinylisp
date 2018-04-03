@@ -18,7 +18,7 @@ void my_printf(void *_, const char *fmt, ...) {
 	va_end(ap);
 }
 
-void _main_k(tl_interp *in, tl_object *result, void *_) {
+void _main_k(tl_interp *in, tl_object *result, tl_object *_) {
 	fprintf(stderr, "Value: ");
 	tl_print(in, tl_first(result));
 	fprintf(stderr, "\n");

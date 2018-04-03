@@ -39,10 +39,14 @@ int tl_push_eval(tl_interp *in, tl_object *expr, tl_object *env) {
 
 void tl_push_apply(tl_interp *in, long len, tl_object *expr, tl_object *env) {
 	in->conts = tl_new_pair(in, tl_new_pair(in, tl_new_int(in, len), tl_new_pair(in, expr, env)), in->conts);
+	in->ctr_events++;
+	if(in->ctr_events >= in->gc_events) {
+		tl_gc(in);
+		in->ctr_events = 0;
+	}
 }
 
-void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, void *_cont) {
-	tl_object *cont = _cont;
+void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, tl_object *cont) {
 	tl_object *callex = tl_first(tl_next(cont));
 	tl_object *env = tl_next(tl_next(cont));
 	long paramlen = tl_list_len(callex->args);
@@ -148,6 +152,7 @@ int tl_apply_next(tl_interp *in) {
 			break;
 
 		case TL_MACRO:
+			in->env = env;
 			_tl_apply_next_body_callable_k(in, args, tl_new_pair(in, tl_new_int(in, len), tl_new_pair(in, callex, env)));
 			break;
 
@@ -156,7 +161,7 @@ int tl_apply_next(tl_interp *in) {
 				tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "bad cont arity (1)"), args));
 				return 0;
 			}
-			in->conts = callex->ret_cont;
+			in->conts = callex->ret_conts;
 			in->values = callex->ret_values;
 			in->env = callex->ret_env;
 			tl_push_eval(in, tl_first(args), env);
@@ -169,14 +174,13 @@ int tl_apply_next(tl_interp *in) {
 	return 1;
 }
 
-void _tl_eval_and_then(tl_interp *in, tl_object *expr, void *state, void (*then)(tl_interp *, tl_object *, void *), const char *name) {
+void _tl_eval_and_then(tl_interp *in, tl_object *expr, tl_object *state, void (*then)(tl_interp *, tl_object *, tl_object *), const char *name) {
 	tl_object *tobj = tl_new_then(in, then, state, name);
 	tl_push_apply(in, 1, tobj, in->env);
 	tl_push_eval(in, expr, in->env);
 }
 
-void _tl_eval_all_args_k(tl_interp *in, tl_object *result, void *_state) {
-	tl_object *state = _state;
+void _tl_eval_all_args_k(tl_interp *in, tl_object *result, tl_object *state) {
 	tl_object *args = tl_first(tl_first(tl_first(state)));
 	tl_object *stack = tl_new_pair(in, tl_first(result), tl_next(tl_first(state)));
 	tl_object *then = tl_next(state);
@@ -197,7 +201,7 @@ void _tl_eval_all_args_k(tl_interp *in, tl_object *result, void *_state) {
 	}
 }
 
-void _tl_eval_all_args(tl_interp *in, tl_object *args, void *state, void (*then)(tl_interp *, tl_object *, void *), const char *name) {
+void _tl_eval_all_args(tl_interp *in, tl_object *args, tl_object *state, void (*then)(tl_interp *, tl_object *, tl_object *), const char *name) {
 	tl_object *tobj = tl_new_then(in, then, state, name);
 	if(args) {
 		tl_object *state = tl_new_pair(in,
