@@ -42,10 +42,22 @@ tl_object *tl_new_pair(tl_interp *in, tl_object *first, tl_object *next) {
 
 tl_object *tl_new_then(tl_interp *in, void (*cfunc)(tl_interp *, tl_object *, tl_object *), tl_object *state, const char *name) {
 	tl_object *obj = tl_new(in);
-	obj->kind = TL_CFUNC;
+	obj->kind = TL_THEN;
 	obj->cfunc = cfunc;
 	obj->state = state;
 	obj->name = name ? strdup(name) : NULL;
+	return obj;
+}
+
+tl_object *_tl_new_cfunc(tl_interp *in, void (*cfunc)(tl_interp *, tl_object *, tl_object *), const char *name) {
+	tl_object *obj = tl_new_then(in, cfunc, TL_EMPTY_LIST, name);
+	obj->kind = TL_CFUNC;
+	return obj;
+}
+
+tl_object *_tl_new_cfunc_byval(tl_interp *in, void (*cfunc)(tl_interp *, tl_object *, tl_object *), const char *name) {
+	tl_object *obj = tl_new_then(in, cfunc, TL_EMPTY_LIST, name);
+	obj->kind = TL_CFUNC_BYVAL;
 	return obj;
 }
 
@@ -94,6 +106,8 @@ void tl_free(tl_interp *in, tl_object *obj) {
 			break;
 
 		case TL_CFUNC:
+		case TL_CFUNC_BYVAL:
+		case TL_THEN:
 			free(obj->name);
 			break;
 
@@ -113,6 +127,8 @@ static void _tl_mark_pass(tl_object *obj) {
 			break;
 
 		case TL_CFUNC:
+		case TL_CFUNC_BYVAL:
+		case TL_THEN:
 			_tl_mark_pass(obj->state);
 			break;
 

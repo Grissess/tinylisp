@@ -123,23 +123,66 @@
   (lambda (v)
 	(= (type v) 'pair)))
 
+(define append
+  (lambda (pref suff)
+	(if (null? pref) suff
+	  (if (null? (cdr pref))
+		(cons (car pref) suff)
+		(cons (car pref) (append (cdr pref) suff))))))
+
+(define reverse
+  (lambda (l)
+	(define res '())
+	(map (lambda (e) (set! res (cons e res))) l)
+	res))
+
 (tl-prefix "," unquote)
+(tl-prefix "@" unquote-splicing)
 (tl-prefix "`" quasiquote)
+;(define tl-quasiquote
+;  (lambda (l environ)
+;	(display 0 l (car l) (cdr l))
+;	(if (null? l)
+;	  (begin (display 5) ''())
+;	  (if (pair? (car l))
+;		(if (= (caar l) 'unquote)
+;		  (begin (display 1) (cons (tl-eval-in environ (cadar l)) (tl-quasiquote (cdr l) environ)))
+;		  (if (= (caar l) 'unquote-splicing)
+;			(begin (display 2) (append (tl-eval-in environ (cadar l)) (tl-quasiquote (cdr l) environ)))
+;			(begin (display 3) (cons (tl-quasiquote (car l) environ) (tl-quasiquote (cdr l) environ)))))
+;		(begin (display 4) (cons (car l) (tl-quasiquote (cdr l) environ)))))))
+(define tl-quasiquote
+  (lambda (l env)
+	(if (null? l)
+	  '()
+	  (if (pair? (car l))
+		(if (= (caar l) 'unquote)
+		  (cons (tl-eval-in env (cadar l)) (tl-quasiquote (cdr l) env))
+		  (if (= (caar l) 'unquote-splicing)
+			(append (tl-eval-in env (cadar l)) (tl-quasiquote (cdr l) env))
+			(cons (tl-quasiquote (car l) env) (tl-quasiquote (cdr l) env))))
+		(cons (car l) (tl-quasiquote (cdr l) env))))))
+
 (define quasiquote
   (macro (rest) environ
-		 (map (lambda (x)
-				(if (pair? x)
-				  (if (= 'unquote (car x))
-					(tl-eval-in environ (car (cdr x)))
-					x)
-				  x))
-			  (car rest))))
+		 (tl-quasiquote (car rest) environ)))
+
+(define begin
+  (macro (rest) environ
+		 (tl-eval-in environ `((lambda () @rest)))))
+(define cond
+  (macro (clauses) environ
+		 (if (tl-eval-in environ (caar clauses))
+		   (tl-eval-in environ (cons 'begin (cdar clauses)))
+		   (tl-eval-in environ (cons 'cond (cdr clauses))))))
+
+(define else #t)
 
 ; Silly aliases
 
 (define eval
   (macro (expr) environ
-		 (tl-eval-in environ expr)))
+		 (tl-eval-in& environ (car expr) (lambda (ex) (tl-eval-in environ ex)))))
 
 (define caar
   (lambda (l)
@@ -255,18 +298,6 @@
 
 ; Language essentials
 
-(define last
-  (lambda (l)
-	(if (null? (cdr l))
-	  (car l)
-	  (if (pair? (cdr l))
-		(last (cdr l))
-		(cdr l)))))
-
-(define begin
-  (macro (rest) environ
-		 (last (map (lambda (x) (tl-eval-in environ x)) rest))))
-
 (define list
   (macro (rest) environ
 		 (foldl cons '() (map (lambda (x) (tl-eval-in environ x)) rest))))
@@ -287,13 +318,6 @@
 ;		   (cons 'begin body)
 ;		   (cons (car bindings) (cons (cdr bindings) '())))))
 
-(define cond
-  (macro (clauses) environ
-		 (if (tl-eval-in environ (caar clauses))
-		   (tl-eval-in environ (cons 'begin (cdar clauses)))
-		   (tl-eval-in environ (cons 'cond (cdr clauses))))))
-
-(define else #t)
 
 ; List manipulation
 

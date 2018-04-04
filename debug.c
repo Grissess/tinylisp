@@ -36,7 +36,12 @@ void tl_dbg_print(tl_object *obj, int level) {
 			break;
 
 		case TL_CFUNC:
-			fprintf(stderr, "CFUNC: %p\n", obj->cfunc);
+		case TL_CFUNC_BYVAL:
+		case TL_THEN:
+			fprintf(stderr, "%s: %p\n", obj->kind == TL_CFUNC ? "CFUNC" : (obj->kind == TL_CFUNC_BYVAL? "CFUNC_BYVAL" : "THEN"), obj->cfunc);
+			_indent(level + 1);
+			fprintf(stderr, "state:\n");
+			tl_dbg_print(obj->state, level + 2);
 			break;
 
 		case TL_MACRO:

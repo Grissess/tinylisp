@@ -18,7 +18,9 @@ typedef struct tl_object_s {
 		TL_INT,
 		TL_SYM,
 		TL_PAIR,
+		TL_THEN,
 		TL_CFUNC,
+		TL_CFUNC_BYVAL,
 		TL_MACRO,
 		TL_FUNC,
 		TL_CONT,
@@ -68,7 +70,10 @@ tl_object *tl_new_int(tl_interp *, long);
 tl_object *tl_new_sym(tl_interp *, const char *);
 tl_object *tl_new_pair(tl_interp *, tl_object *, tl_object *);
 tl_object *tl_new_then(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), tl_object *, const char *);
-#define tl_new_cfunc(in, cf) tl_new_then((in), (cf), NULL, #cf)
+tl_object *_tl_new_cfunc(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
+#define tl_new_cfunc(in, cf) _tl_new_cfunc((in), (cf), #cf)
+tl_object *_tl_new_cfunc_byval(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
+#define tl_new_cfunc_byval(in, cf) _tl_new_cfunc_byval((in), (cf), #cf)
 tl_object *tl_new_macro(tl_interp *, tl_object *, const char *, tl_object *, tl_object *);
 #define tl_new_func(in, args, body, env) tl_new_macro((in), (args), NULL, (body), (env))
 tl_object *tl_new_cont(tl_interp *, tl_object *, tl_object *, tl_object *);
@@ -79,11 +84,13 @@ void tl_gc(tl_interp *);
 #define tl_is_sym(obj) ((obj) && (obj)->kind == TL_SYM)
 /* FIXME: NULL is a valid empty list */
 #define tl_is_pair(obj) (!(obj) || (obj)->kind == TL_PAIR)
+#define tl_is_then(obj) ((obj) && (obj)->kind == TL_THEN)
 #define tl_is_cfunc(obj) ((obj) && (obj)->kind == TL_CFUNC)
+#define tl_is_cfunc_byval(obj) ((obj) && (obj)->kind == TL_CFUNC_BYVAL)
 #define tl_is_macro(obj) ((obj) && (obj)->kind == TL_MACRO)
 #define tl_is_func(obj) ((obj) && (obj)->kind == TL_FUNC)
 #define tl_is_cont(obj) ((obj) && (obj)->kind == TL_CONT)
-#define tl_is_callable(obj) (tl_is_cfunc(obj) || tl_is_macro(obj) || tl_is_func(obj) || tl_is_cont(obj))
+#define tl_is_callable(obj) (tl_is_cfunc(obj) || tl_is_cfunc_byval(obj) || tl_is_then(obj)|| tl_is_macro(obj) || tl_is_func(obj) || tl_is_cont(obj))
 
 #define tl_first(obj) (((obj) && tl_is_pair(obj)) ? (obj)->first : NULL)
 #define tl_next(obj) (((obj) && tl_is_pair(obj)) ? (obj)->next : NULL)
@@ -127,39 +134,40 @@ tl_object *tl_frm_set(tl_interp *, tl_object *, const char *, tl_object *);
 void tl_cf_macro(tl_interp *, tl_object *, tl_object *);
 void tl_cf_lambda(tl_interp *, tl_object *, tl_object *);
 void tl_cf_define(tl_interp *, tl_object *, tl_object *);
-void tl_cf_display(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_display(tl_interp *, tl_object *, tl_object *);
 void tl_cf_prefix(tl_interp *, tl_object *, tl_object *);
-void tl_cf_error(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_error(tl_interp *, tl_object *, tl_object *);
 void tl_cf_set(tl_interp *, tl_object *, tl_object *);
-void tl_cf_env(tl_interp *, tl_object *, tl_object *);
-void tl_cf_setenv(tl_interp *, tl_object *, tl_object *);
-void tl_cf_topenv(tl_interp *, tl_object *, tl_object *);
-void tl_cf_type(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_env(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_setenv(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_topenv(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_type(tl_interp *, tl_object *, tl_object *);
 
-void tl_cf_cons(tl_interp *, tl_object *, tl_object *);
-void tl_cf_car(tl_interp *, tl_object *, tl_object *);
-void tl_cf_cdr(tl_interp *, tl_object *, tl_object *);
-void tl_cf_null(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_cons(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_car(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_cdr(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_null(tl_interp *, tl_object *, tl_object *);
 void tl_cf_if(tl_interp *, tl_object *, tl_object *);
 
-void tl_cf_concat(tl_interp *, tl_object *, tl_object *);
-void tl_cf_length(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_concat(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_length(tl_interp *, tl_object *, tl_object *);
 
-void tl_cf_add(tl_interp *, tl_object *, tl_object *);
-void tl_cf_sub(tl_interp *, tl_object *, tl_object *);
-void tl_cf_mul(tl_interp *, tl_object *, tl_object *);
-void tl_cf_div(tl_interp *, tl_object *, tl_object *);
-void tl_cf_mod(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_add(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_sub(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_mul(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_div(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_mod(tl_interp *, tl_object *, tl_object *);
 
-void tl_cf_eq(tl_interp *, tl_object *, tl_object *);
-void tl_cf_less(tl_interp *, tl_object *, tl_object *);
-void tl_cf_nand(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_eq(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_less(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_nand(tl_interp *, tl_object *, tl_object *);
 
 tl_object *tl_print(tl_interp *, tl_object *);
 
-#define tl_values_push(in, v) (in)->values = tl_new_pair((in), (v), (in)->values)
+#define tl_values_push(in, v) (in)->values = tl_new_pair((in), tl_new_pair((in), (v), (in)->false_), (in)->values)
+#define tl_values_push_syntactic(in, v) (in)->values = tl_new_pair((in), tl_new_pair((in), (v), (in)->true_), (in)->values)
 #define tl_values_pop_into(in, var) do { \
-	var = tl_first((in)->values); \
+	var = tl_first(tl_first((in)->values)); \
 	(in)->values = tl_next((in)->values); \
 } while(0)
 #define tl_cfunc_return(in, v) do { tl_values_push((in), (v)); return; } while(0)
@@ -176,14 +184,14 @@ void _tl_eval_all_args(tl_interp *, tl_object *, tl_object *, void (*)(tl_interp
 #define tl_eval_all_args(in, args, state, cb) _tl_eval_all_args((in), (args), (state), (cb), "tl_eval_all_args:" #cb)
 #define tl_run_until_done(in) while(tl_apply_next((in)))
 
-void tl_cf_evalin(tl_interp *, tl_object *, tl_object *);
-void tl_cf_call_with_current_continuation(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_evalin(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_call_with_current_continuation(tl_interp *, tl_object *, tl_object *);
 /* tl_object *tl_cf_apply(tl_interp *, tl_object *); */
 
 tl_object *tl_read(tl_interp *, tl_object *);
 
-void tl_cf_read(tl_interp *, tl_object *, tl_object *);
-void tl_cf_gc(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_read(tl_interp *, tl_object *, tl_object *);
+void tl_cfbv_gc(tl_interp *, tl_object *, tl_object *);
 
 #ifdef DEBUG
 void tl_dbg_print(tl_object *, int);

@@ -46,7 +46,9 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			break;
 
 		case TL_CFUNC:
-			in->printf(in->udata, "%s:%p", obj->name ? obj->name : "<cfunc>", obj->cfunc);
+		case TL_CFUNC_BYVAL:
+		case TL_THEN:
+			in->printf(in->udata, "%s:%p", obj->name ? obj->name : (obj->kind == TL_CFUNC ? "<cfunc>" : (obj->kind == TL_CFUNC_BYVAL ? "<cfunc_byval>" : "<then>")), obj->cfunc);
 			break;
 
 		case TL_MACRO:

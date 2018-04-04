@@ -1,5 +1,6 @@
 OBJ := builtin.o env.o eval.o interp.o object.o print.o read.o debug.o main.o
 SRC := $(patsubst %.o,%.c,$(OBJ))
+#CFLAGS := -g -std=gnu99 -DDEBUG -DCONT_DEBUG
 CFLAGS := -g -std=gnu99 -DDEBUG
 LDFLAGS := 
 DESTDIR := /usr/local/

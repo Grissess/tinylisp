@@ -28,7 +28,7 @@ int tl_push_eval(tl_interp *in, tl_object *expr, tl_object *env) {
 			if(subex == tl_first(expr)) {
 				tl_push_apply(in, (long) len - 1, subex, env);
 			} else {
-				tl_values_push(in, subex);
+				tl_values_push_syntactic(in, subex);
 			}
 		}
 		return 1;
@@ -49,6 +49,10 @@ void tl_push_apply(tl_interp *in, long len, tl_object *expr, tl_object *env) {
 void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, tl_object *cont) {
 	tl_object *callex = tl_first(tl_next(cont));
 	tl_object *env = tl_next(tl_next(cont));
+	if(tl_is_cfunc(callex) || tl_is_cfunc_byval(callex) || tl_is_then(callex)) {
+		callex->cfunc(in, args, callex->state);
+		return;
+	}
 	long paramlen = tl_list_len(callex->args);
 	if(tl_is_macro(callex) ? (tl_list_len(args) < paramlen) : (tl_list_len(args) != paramlen)) {
 		tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "bad arity"), tl_new_int(in, paramlen)), args));
@@ -83,11 +87,11 @@ int tl_apply_next(tl_interp *in) {
 	len = tl_first(cont)->ival;
 	callex = tl_first(tl_next(cont));
 	env = tl_next(tl_next(cont));
-	/*
+#ifdef CONT_DEBUG
 	in->printf(in->udata, "Apply Next len %ld Callex: ", len);
 	tl_print(in, callex);
 	in->printf(in->udata, " ");
-	*/
+#endif
 	if(len == TL_APPLY_DROP) {
 		in->values = tl_next(in->values);
 		return 1;
@@ -95,7 +99,9 @@ int tl_apply_next(tl_interp *in) {
 	if(len != TL_APPLY_INDIRECT) {
 		if(tl_push_eval(in, callex, env)) {
 			if(!(len == TL_APPLY_PUSH_EVAL || len == TL_APPLY_DROP_EVAL)) {
-				/* in->printf(in->udata, "[indirected]\n"); */
+#ifdef CONT_DEBUG
+				in->printf(in->udata, "[indirected]\n");
+#endif
 				cont = tl_first(in->conts);
 				in->conts = tl_next(in->conts);
 				tl_push_apply(in, TL_APPLY_INDIRECT, tl_new_int(in, len), env);
@@ -109,24 +115,30 @@ int tl_apply_next(tl_interp *in) {
 			return 1;
 		}
 	} else {
-		/* in->printf(in->udata, "[resuming indirect]"); */
+#ifdef CONT_DEBUG
+		in->printf(in->udata, "[resuming indirect]");
+#endif
 		len = tl_first(tl_next(cont))->ival;
 	}
-	/* in->printf(in->udata, "\n"); */
+#ifdef CONT_DEBUG
+	in->printf(in->udata, "\n");
+#endif
 	tl_values_pop_into(in, callex);
-	/*
+#ifdef CONT_DEBUG
 	in->printf(in->udata, "Apply Next: %ld call: ", len);
 	tl_print(in, callex);
 	in->printf(in->udata, " values: ");
 	tl_print(in, in->values);
+	/*
 	in->printf(in->udata, " env: ");
 	tl_print(in, env);
+	*/
 	in->printf(in->udata, " stack: ");
 	for(tl_list_iter(in->conts, ct)) {
 		tl_print(in, tl_new_pair(in, tl_first(ct), tl_first(tl_next(ct))));
 	}
 	in->printf(in->udata, "\n");
-	*/
+#endif
 	if(len == TL_APPLY_DROP_EVAL) return 1;
 	if(len == TL_APPLY_PUSH_EVAL) {
 		tl_values_push(in, callex);
@@ -140,20 +152,25 @@ int tl_apply_next(tl_interp *in) {
 		args = tl_new_pair(in, tl_first(in->values), args);
 		in->values = tl_next(in->values);
 	}
+	in->env = env;
+	tl_object *new_args = TL_EMPTY_LIST;
 	switch(callex->kind) {
-		case TL_CFUNC:
-			in->env = env;
-			callex->cfunc(in, args, callex->state);
-			break;
-
 		case TL_FUNC:
-			in->env = env;
+		case TL_CFUNC_BYVAL:
 			tl_eval_all_args(in, args, tl_new_pair(in, tl_new_int(in, len), tl_new_pair(in, callex, env)), _tl_apply_next_body_callable_k);
 			break;
 
 		case TL_MACRO:
-			in->env = env;
-			_tl_apply_next_body_callable_k(in, args, tl_new_pair(in, tl_new_int(in, len), tl_new_pair(in, callex, env)));
+		case TL_CFUNC:
+		case TL_THEN:
+			for(tl_list_iter(args, arg)) {
+				if(callex->kind != TL_THEN && tl_next(arg) != in->true_) {
+					tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "invoke macro/cfunc with non-syntactic arg"), callex), arg));
+					return 0;
+				}
+				new_args = tl_new_pair(in, tl_first(arg), new_args);
+			}
+			_tl_apply_next_body_callable_k(in, tl_list_rvs(in, new_args), tl_new_pair(in, tl_new_int(in, len), tl_new_pair(in, callex, env)));
 			break;
 
 		case TL_CONT:
@@ -164,7 +181,11 @@ int tl_apply_next(tl_interp *in) {
 			in->conts = callex->ret_conts;
 			in->values = callex->ret_values;
 			in->env = callex->ret_env;
-			tl_push_eval(in, tl_first(args), env);
+			if(tl_next(tl_first(args)) == in->true_) {
+				tl_push_eval(in, tl_first(tl_first(args)), env);
+			} else {
+				tl_values_push(in, tl_first(tl_first(args)));
+			}
 			break;
 
 		default:
@@ -192,7 +213,12 @@ void _tl_eval_all_args_k(tl_interp *in, tl_object *result, tl_object *state) {
 		then
 	);
 	if(args) {
-		tl_eval_and_then(in, tl_first(args), new_state, _tl_eval_all_args_k);
+		if(tl_next(tl_first(args)) == in->true_) {
+			tl_eval_and_then(in, tl_first(tl_first(args)), new_state, _tl_eval_all_args_k);
+		} else {
+			tl_values_push(in, tl_first(tl_first(args)));
+			tl_push_apply(in, 1, tl_new_then(in, _tl_eval_all_args_k, new_state, "_tl_apply_all_args_k<direct>"), in->env);
+		}
 	} else {
 		for(tl_list_iter(tl_list_rvs(in, stack), elem)) {
 			tl_values_push(in, elem);
@@ -211,7 +237,12 @@ void _tl_eval_all_args(tl_interp *in, tl_object *args, tl_object *state, void (*
 			),
 			tobj
 		);
-		tl_eval_and_then(in, tl_first(args), state, _tl_eval_all_args_k);
+		if(tl_next(tl_first(args)) == in->true_) {
+			tl_eval_and_then(in, tl_first(tl_first(args)), state, _tl_eval_all_args_k);
+		} else {
+			tl_values_push(in, tl_first(tl_first(args)));
+			tl_push_apply(in, 1, tl_new_then(in, _tl_eval_all_args_k, state, "_tl_apply_all_args_k<direct>"), in->env);
+		}
 	} else {
 		tl_push_apply(in, 0, tl_new_then(in, then, state, name), in->env);
 	}
