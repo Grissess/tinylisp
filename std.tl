@@ -139,18 +139,6 @@
 (tl-prefix "," unquote)
 (tl-prefix "@" unquote-splicing)
 (tl-prefix "`" quasiquote)
-;(define tl-quasiquote
-;  (lambda (l environ)
-;	(display 0 l (car l) (cdr l))
-;	(if (null? l)
-;	  (begin (display 5) ''())
-;	  (if (pair? (car l))
-;		(if (= (caar l) 'unquote)
-;		  (begin (display 1) (cons (tl-eval-in environ (cadar l)) (tl-quasiquote (cdr l) environ)))
-;		  (if (= (caar l) 'unquote-splicing)
-;			(begin (display 2) (append (tl-eval-in environ (cadar l)) (tl-quasiquote (cdr l) environ)))
-;			(begin (display 3) (cons (tl-quasiquote (car l) environ) (tl-quasiquote (cdr l) environ)))))
-;		(begin (display 4) (cons (car l) (tl-quasiquote (cdr l) environ)))))))
 (define tl-quasiquote
   (lambda (l env)
 	(if (null? l)
@@ -166,17 +154,6 @@
 (define quasiquote
   (macro (rest) environ
 		 (tl-quasiquote (car rest) environ)))
-
-(define begin
-  (macro (rest) environ
-		 (tl-eval-in environ `((lambda () @rest)))))
-(define cond
-  (macro (clauses) environ
-		 (if (tl-eval-in environ (caar clauses))
-		   (tl-eval-in environ (cons 'begin (cdar clauses)))
-		   (tl-eval-in environ (cons 'cond (cdr clauses))))))
-
-(define else #t)
 
 ; Silly aliases
 
@@ -302,15 +279,26 @@
   (macro (rest) environ
 		 (foldl cons '() (map (lambda (x) (tl-eval-in environ x)) rest))))
 
+(define begin
+  (macro (rest) environ
+		 (tl-eval-in environ `((lambda () @rest)))))
+(define cond
+  (macro (clauses) environ
+		 (if (tl-eval-in environ (caar clauses))
+		   (tl-eval-in environ (cons 'begin (cdar clauses)))
+		   (tl-eval-in environ (cons 'cond (cdr clauses))))))
+
+(define else #t)
+
 (define let
   (macro (bindings body) environ
-		 (tl-eval-in environ (cons (cons 'lambda (cons (map car bindings) body)) (map cadr bindings)))))
+		 (tl-eval-in environ `((lambda ,(map car bindings) @body) @(map cadr bindings)))))
 
 (define let*
   (macro (bindings body) environ
 		 (tl-eval-in environ (if (null? bindings)
-		   (cons 'begin body)
-		   (cons 'let (cons (cons (car bindings) '()) (cons (cons 'let* (cons (cdr bindings) body)) '())))))))
+							   `(begin @body)
+							   `(let (,(car bindings)) (let* ,(cdr bindings) @body))))))
 
 ;(define let*
 ;  (macro (bindings body)
