@@ -58,6 +58,14 @@
 	  '()
 	  (cons (f (car l)) (map f (cdr l))))))
 
+(define for-each
+  (lambda (f l)
+	(if (null? l)
+	  #t
+	  (begin
+		(f (car l))
+		(for-each f (cdr l))))))
+
 (define foldr
   (lambda (f v l)
 	(if (null? l)
@@ -133,7 +141,7 @@
 (define reverse
   (lambda (l)
 	(define res '())
-	(map (lambda (e) (set! res (cons e res))) l)
+	(for-each (lambda (e) (set! res (cons e res))) l)
 	res))
 
 (tl-prefix "," unquote)

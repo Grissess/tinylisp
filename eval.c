@@ -217,7 +217,7 @@ void _tl_eval_all_args_k(tl_interp *in, tl_object *result, tl_object *state) {
 			tl_eval_and_then(in, tl_first(tl_first(args)), new_state, _tl_eval_all_args_k);
 		} else {
 			tl_values_push(in, tl_first(tl_first(args)));
-			tl_push_apply(in, 1, tl_new_then(in, _tl_eval_all_args_k, new_state, "_tl_apply_all_args_k<direct>"), in->env);
+			tl_push_apply(in, 1, tl_new_then(in, _tl_eval_all_args_k, new_state, "_tl_apply_all_args_k<indirect>"), in->env);
 		}
 	} else {
 		for(tl_list_iter(tl_list_rvs(in, stack), elem)) {

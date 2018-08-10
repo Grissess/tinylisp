@@ -184,17 +184,22 @@ void tl_cfbv_topenv(tl_interp *in, tl_object *args, tl_object *_) {
 }
 
 void tl_cfbv_concat(tl_interp *in, tl_object *args, tl_object *_) {
-	char *buffer = "", *new_buffer;
-	char *orig_buffer = buffer;
-	size_t sz;
+	char *buffer, *end, *src;
+	size_t sz = 0;
 	for(tl_list_iter(args, val)) {
 		verify_type(in, val, sym, "concat");
-		sz = snprintf(NULL, 0, "%s%s", buffer, val->str);
-		new_buffer = malloc(sz + 1);
-		snprintf(new_buffer, sz + 1, "%s%s", buffer, val->str);
-		if(buffer != orig_buffer) free(buffer);
-		buffer = new_buffer;
+		sz += strlen(val->str);
 	}
+	end = buffer = malloc(sz + 1);
+	if(!buffer) tl_error_set(in, tl_new_sym(in, "out of memory"));
+	for(tl_list_iter(args, val)) {
+		src = val->str;
+		while(sz > 0 && *src) {
+			*end++ = *src++;
+			sz--;
+		}
+	}
+	*end = 0;
 	tl_cfunc_return(in, tl_new_sym(in, buffer));
 }
 

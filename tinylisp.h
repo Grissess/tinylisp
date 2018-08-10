@@ -4,16 +4,31 @@
 #include <stddef.h>
 
 #ifndef NULL
+/** Standard NULL. Only defined if not in `stddef.h`. */
 #define NULL ((void *) 0)
 #endif
 
 #ifndef EOF
+/** Standard EOF. Only defined if not in `stdio.h`.
+ *
+ * You may use this in the `readf` implementation of your interpreter
+ * interface.
+ */
 #define EOF ((int) -1)
 #endif
 
 typedef struct tl_interp_s tl_interp;
 
+/** Object structure
+ *
+ * This structure describes every TinyLisp object at runtime, and contains the
+ * pertinent members to each type.
+ *
+ * Note that `NULL` is a valid object--it is `TL_EMPTY_LIST`, the empty pair
+ * `()`.
+ */
 typedef struct tl_object_s {
+	/** The type of this object. Instead of testing this directly, you should prefer the `tl_is_*` macros instead. */
 	enum {
 		TL_INT,
 		TL_SYM,
@@ -26,43 +41,107 @@ typedef struct tl_object_s {
 		TL_CONT,
 	} kind;
 	union {
+		/** For `TL_INT`, the signed long integer value. Note that TL does not internally support unlimited precision. */
 		long ival;
+		/** For `TL_SYM`, a pointer to a C string containing the symbol name. The pointed-to memory should be treated as read-only&mdash;if you need a new symbol, make another. */
 		char *str;
 		struct {
+			/** For (non-NULL) `TL_PAIR`, a pointer to the first of the pair (CAR in traditional LISP). */
 			struct tl_object_s *first;
+			/** For (non-NULL) `TL_PAIR`, a pointer to the next of the pair (CDR in traditional LISP). */
 			struct tl_object_s *next;
 		};
 		struct {
+			/** For `TL_THEN` and `TL_CFUNC`, a pointer to the actual C function. */
 			void (*cfunc)(tl_interp *, struct tl_object_s *, struct tl_object_s *);
+			/** For `TL_THEN`, the state argument (parameter 3). */
 			struct tl_object_s *state;
+			/** For `TL_THEN` and `TL_CFUNC`, a C string containing the name of the function, or `NULL`. */
 			char *name;
 		};
 		struct {
+			/** For `TL_MACRO` and `TL_FUNC`, the formal arguments (a linear list of symbols). */
 			struct tl_object_s *args;
+			/** For `TL_MACRO` and `TL_FUNC`, the body of the function (a linear list of expressions, usually other lists, for which the last provides the valuation). */
 			struct tl_object_s *body;
+			/** For `TL_MACRO` and `TL_FUNC`, the environment captured by the function or macro when it was defined. */
 			struct tl_object_s *env;
+			/** For `TL_MACRO`, the C string containing the name of the argument which will be bound to the evaluation environment, or `NULL`. */
 			char *envn;
 		};
 		struct {
+			/** For `TL_CONT`, the evaluation environment to which to return. */
 			struct tl_object_s *ret_env;
+			/** For `TL_CONT`, the return continuation stack to which to return. */
 			struct tl_object_s *ret_conts;
+			/** For `TL_CONT`, the value stack to which to return. */
 			struct tl_object_s *ret_values;
 		};
 	};
 	union {
+		/** For the garbage collector, a pointer to the next allocated object. */
 		struct tl_object_s *next_alloc;
+		/** As `next_alloc` but cast to an integer of platform size. Used by the GC for bitpacking. */
 		size_t next_alloc_i;
 	};
+	/** For the garbage collector, a pointer to the previous allocated object. */
 	struct tl_object_s *prev_alloc;
 } tl_object;
 
+/** For the garbage collector, the bitmask for bitpacking into :ref:`next_alloc_i`. 
+ *
+ * This claims 2 bits of the bottom of the address, which means all objects
+ * must be 4-byte aligned. This is the norm on most 32-bit and 64-bit
+ * processors (and possibly some others), but may need to be manually tweaked
+ * for esoteric platofms.
+ */
 #define TL_FMASK 0x3
+/** Mark bit for bitpacking int :ref:`next_alloc_i`.
+ *
+ * The garbage collector uses this to mark objects during the mark pass of its
+ * mark/sweep operation.
+ */
 #define TL_F_MARK 0x1
 
+/** Mark an object.
+ *
+ * This sets a bit in the :ref:`next_alloc_i` field of *this* object.
+ *
+ * Only the garbage collector should do this. It clears all marks before doing
+ * a mark pass, anyway.
+ */
 #define tl_mark(obj) ((obj)->next_alloc_i |= TL_F_MARK)
+/** Unmark an object.
+ *
+ * This clears a bit in the :ref:`next_alloc_i` field of *this* object.
+ *
+ * Only the garbage collector should use this.
+ */
 #define tl_unmark(obj) ((obj)->next_alloc_i &= ~TL_FMASK)
+/** Check if an object is marked.
+ *
+ * This checks a bit in the :ref:`next_alloc_i` field of *this* object.
+ *
+ * This is generally only valid after a mark pass of the garbage collector.
+ */
 #define tl_is_marked(obj) ((obj)->next_alloc_i & TL_F_MARK)
+/** Safely dereference the next allocated object.
+ *
+ * This is necessary because the low bits may have packed flags via
+ * :ref:`next_alloc_i`.
+ */
 #define tl_next_alloc(obj) ((tl_object *)((obj)->next_alloc_i & (~TL_FMASK)))
+/** Create a new `next_alloc` pointer to store in an object.
+ *
+ * The value of this macro is suitable to store in :ref:`next_alloc`.
+ *
+ * Pass `orig` as the current value of :ref:`next_alloc`, and `ptr` as the pointer
+ * to the new object to store as the "next allocation". This macro preserves
+ * flags packed into :ref:`next_alloc_i` onto this object.
+ *
+ * Generally, only the allocator needs to do this. Don't forget to keep the
+ * doubly-linked-list valid by updating :ref:`prev_alloc` as well.
+ */
 #define tl_make_next_alloc(orig, ptr) ((tl_object *)(((obj)->next_alloc_i & (~TL_FMASK)) | (((size_t)(orig)) & TL_FMASK)))
 
 tl_object *tl_new(tl_interp *);
