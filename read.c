@@ -21,7 +21,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 	char *symbuf;
 
 	while(1) {
-		switch(c = in->readf(in->udata)) {
+		switch(c = tl_getc(in)) {
 			case EOF:
 				return NULL;
 				break;
@@ -31,13 +31,13 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 				break;
 
 			case ';':
-				while(in->readf(in->udata) != '\n');
+				while(tl_getc(in) != '\n');
 				continue;
 				break;
 
 			case '(':
 				while(1) {
-					switch(d = in->readf(in->udata)) {
+					switch(d = tl_getc(in)) {
 						case ' ': case '\n': case '\t': case '\v': case '\r': case '\b':
 							continue;
 							break;
@@ -47,7 +47,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 							break;
 
 						default:
-							in->putbackf(in->udata, d);
+							tl_putback(in, d);
 							list = tl_new_pair(in, tl_read(in, TL_EMPTY_LIST), list);
 							break;
 					}
@@ -57,7 +57,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 			case '"':
 				q = c;
 				symbuf = calloc(MAX_SYM_LEN + 1, sizeof(char));
-				while(idx < MAX_SYM_LEN && (d = in->readf(in->udata)) != q) {
+				while(idx < MAX_SYM_LEN && (d = in->readf(in->udata, in)) != q) {
 					symbuf[idx++] = d;
 				}
 				return_sym_from_cstr(in, symbuf);
@@ -66,11 +66,11 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 			default:
 				if(isdigit(c)) {
 					ival = c - '0';
-					while(isdigit((c = in->readf(in->udata)))) {
+					while(isdigit((c = tl_getc(in)))) {
 						ival *= 10;
 						ival += c - '0';
 					}
-					in->putbackf(in->udata, c);
+					tl_putback(in, c);
 					return tl_new_int(in, ival);
 				}
 				for(tl_list_iter(in->prefixes, kv)) {
@@ -84,13 +84,13 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 				symbuf = calloc(MAX_SYM_LEN + 1, sizeof(char));
 				symbuf[idx++] = c;
 				while(idx < MAX_SYM_LEN) {
-					switch(d = in->readf(in->udata)) {
+					switch(d = tl_getc(in)) {
 						case ' ': case '\n': case '\t': case '\v': case '\r': case '\b':
 							return_sym_from_cstr(in, symbuf);
 							break;
 
 						case '(': case ')':
-							in->putbackf(in->udata, d);
+							tl_putback(in, d);
 							return_sym_from_cstr(in, symbuf);
 							break;
 

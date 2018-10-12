@@ -11,6 +11,8 @@ void tl_interp_init(tl_interp *in) {
 	in->values = TL_EMPTY_LIST;
 	in->gc_events = 65536;
 	in->ctr_events = 0;
+	in->putback = 0;
+	in->is_putback = 0;
 
 	in->top_env = TL_EMPTY_LIST;
 
@@ -58,6 +60,8 @@ void tl_interp_init(tl_interp *in) {
 
 	top_frm = _tl_frm_set("tl-read", tl_new_cfunc_byval(in, tl_cfbv_read), top_frm);
 	top_frm = _tl_frm_set("tl-gc", tl_new_cfunc_byval(in, tl_cfbv_gc), top_frm);
+
+	top_frm = _tl_frm_set("tl-load-mod", tl_new_cfunc_byval(in, tl_cfbv_load_mod), top_frm);
 
 #ifdef DEBUG
 	top_frm = _tl_frm_set("tl-debug-print", tl_new_cfunc(in, tl_cf_debug_print), top_frm);

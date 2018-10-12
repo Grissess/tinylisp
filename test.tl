@@ -4,6 +4,11 @@
   (lambda (redf v mapf l)
 	(foldr redf v (map mapf l))))
 
+(define binswap
+  (lambda (f)
+	(lambda (a b)
+	  (f b a))))
+
 ; Tests
 (let ((a 1) (b (+ 2 2))) (display a) (display b))
 (let* ((a 1) (b (+ a 1))) (display a) (display b))

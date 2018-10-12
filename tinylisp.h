@@ -43,8 +43,14 @@ typedef struct tl_object_s {
 	union {
 		/** For `TL_INT`, the signed long integer value. Note that TL does not internally support unlimited precision. */
 		long ival;
-		/** For `TL_SYM`, a pointer to a C string containing the symbol name. The pointed-to memory should be treated as read-only&mdash;if you need a new symbol, make another. */
-		char *str;
+		struct {
+			/** For `TL_SYM`, a pointer to a byte array containing the symbol name. The pointed-to memory should be treated as read-only&mdash;if you need a new symbol, make another. */
+			char *str;
+			/** For `TL_SYM`, the length of the pointed-to byte array. */
+			size_t len;
+			/** For `TL_SYM`, a hash of the symbol, used to speed up comparison. */
+			unsigned long hash;
+		};
 		struct {
 			/** For (non-NULL) `TL_PAIR`, a pointer to the first of the pair (CAR in traditional LISP). */
 			struct tl_object_s *first;
@@ -66,8 +72,8 @@ typedef struct tl_object_s {
 			struct tl_object_s *body;
 			/** For `TL_MACRO` and `TL_FUNC`, the environment captured by the function or macro when it was defined. */
 			struct tl_object_s *env;
-			/** For `TL_MACRO`, the C string containing the name of the argument which will be bound to the evaluation environment, or `NULL`. */
-			char *envn;
+			/** For `TL_MACRO`, the TL symbol object containing the name of the argument which will be bound to the evaluation environment, or `NULL`. */
+			struct tl_object_s *envn;
 		};
 		struct {
 			/** For `TL_CONT`, the evaluation environment to which to return. */
@@ -147,13 +153,14 @@ typedef struct tl_object_s {
 tl_object *tl_new(tl_interp *);
 tl_object *tl_new_int(tl_interp *, long);
 tl_object *tl_new_sym(tl_interp *, const char *);
+tl_object *tl_new_sym_data(tl_interp *, const char *, size_t);
 tl_object *tl_new_pair(tl_interp *, tl_object *, tl_object *);
 tl_object *tl_new_then(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), tl_object *, const char *);
 tl_object *_tl_new_cfunc(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
 #define tl_new_cfunc(in, cf) _tl_new_cfunc((in), (cf), #cf)
 tl_object *_tl_new_cfunc_byval(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
 #define tl_new_cfunc_byval(in, cf) _tl_new_cfunc_byval((in), (cf), #cf)
-tl_object *tl_new_macro(tl_interp *, tl_object *, const char *, tl_object *, tl_object *);
+tl_object *tl_new_macro(tl_interp *, tl_object *, tl_object *, tl_object *, tl_object *);
 #define tl_new_func(in, args, body, env) tl_new_macro((in), (args), NULL, (body), (env))
 tl_object *tl_new_cont(tl_interp *, tl_object *, tl_object *, tl_object *);
 void tl_free(tl_interp *, tl_object *);
@@ -180,6 +187,12 @@ void tl_gc(tl_interp *);
 size_t tl_list_len(tl_object *);
 tl_object *tl_list_rvs(tl_interp *, tl_object *);
 
+#define TL_HASH_LINEAR 16
+unsigned long tl_data_hash(const char *, size_t);
+
+#define tl_sym_eq(a, b) (tl_is_sym(a) && tl_is_sym(b) && (a)->len == (b)->len && (a)->hash == (b)->hash && !memcmp(a->str, b->str, a->len))
+#define tl_sym_less(a, b) (tl_is_sym(a) && tl_is_sym(b) && ((a)->len < (b)->len || memcmp((a)->str, (b)->str, (a)->len) < 0))
+
 struct tl_interp_s {
 	tl_object *top_env;
 	tl_object *env;
@@ -192,10 +205,14 @@ struct tl_interp_s {
 	tl_object *values;
 	size_t gc_events;
 	size_t ctr_events;
+	int putback;
+	int is_putback;
 	void *udata;
-	int (*readf)(void *);
-	void (*putbackf)(void *, int);
-	void (*printf)(void *, const char *, ...);
+	int (*readf)(void *, struct tl_interp_s *);
+	void (*writef)(void *, struct tl_interp_s *, char);
+#ifdef CONFIG_MODULES
+	int (*modloadf)(void *, struct tl_interp_s *, const char *);
+#endif
 };
 
 void tl_interp_init(tl_interp *);
@@ -205,10 +222,14 @@ void tl_interp_cleanup(tl_interp *);
 #define tl_error_clear(in) ((in)->error = NULL)
 #define tl_has_error(in) ((in)->error)
 
-tl_object *tl_env_get_kv(tl_object *, const char *);
-tl_object *tl_env_set_global(tl_interp *, tl_object *, const char *, tl_object *);
-tl_object *tl_env_set_local(tl_interp *, tl_object *, const char *, tl_object *);
-tl_object *tl_frm_set(tl_interp *, tl_object *, const char *, tl_object *);
+#define tl_getc(in) ((in)->is_putback ? ((in)->is_putback = 0, (in)->putback) : (in)->readf((in)->udata, (in)))
+#define tl_putback(in, c) ((in)->is_putback = 1, (in)->putback = (c))
+#define tl_putc(in, c) ((in)->writef((in)->udata, (in), (c)))
+
+tl_object *tl_env_get_kv(tl_interp *, tl_object *, tl_object *);
+tl_object *tl_env_set_global(tl_interp *, tl_object *, tl_object *, tl_object *);
+tl_object *tl_env_set_local(tl_interp *, tl_object *, tl_object *, tl_object *);
+tl_object *tl_frm_set(tl_interp *, tl_object *, tl_object *, tl_object *);
 
 void tl_cf_macro(tl_interp *, tl_object *, tl_object *);
 void tl_cf_lambda(tl_interp *, tl_object *, tl_object *);
@@ -241,7 +262,12 @@ void tl_cfbv_eq(tl_interp *, tl_object *, tl_object *);
 void tl_cfbv_less(tl_interp *, tl_object *, tl_object *);
 void tl_cfbv_nand(tl_interp *, tl_object *, tl_object *);
 
+void tl_cfbv_load_mod(tl_interp *, tl_object *, tl_object *);
+
 tl_object *tl_print(tl_interp *, tl_object *);
+void tl_puts(tl_interp *, const char *);
+void tl_write(tl_interp *, const char *, size_t);
+void tl_printf(tl_interp *, const char *, ...);
 
 #define tl_values_push(in, v) (in)->values = tl_new_pair((in), tl_new_pair((in), (v), (in)->false_), (in)->values)
 #define tl_values_push_syntactic(in, v) (in)->values = tl_new_pair((in), tl_new_pair((in), (v), (in)->true_), (in)->values)

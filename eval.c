@@ -14,7 +14,7 @@ int tl_push_eval(tl_interp *in, tl_object *expr, tl_object *env) {
 		return 0;
 	}
 	if(tl_is_sym(expr)) {  /* Variable binding */
-		tl_object *binding = tl_env_get_kv(env, expr->str);
+		tl_object *binding = tl_env_get_kv(in, env, expr);
 		if(!binding) {
 			tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "unknown var"), expr));
 			return 0;
@@ -63,7 +63,7 @@ void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, tl_object *c
 		frm = tl_new_pair(in, tl_new_pair(in, tl_first(acur), (tl_is_func(callex) || tl_next(acur)) ? tl_first(args) : args), frm);
 		args = tl_next(args);
 	}
-	if(callex->envn) frm = tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, callex->envn), env), frm);
+	if(callex->envn) frm = tl_new_pair(in, tl_new_pair(in, callex->envn, env), frm);
 	env = tl_new_pair(in, frm, callex->env);
 	tl_object *body_rvs = tl_list_rvs(in, callex->body);
 	for(tl_list_iter(body_rvs, ex)) {
@@ -76,9 +76,9 @@ int tl_apply_next(tl_interp *in) {
 	long len;
 	tl_object *callex, *env, *args = TL_EMPTY_LIST;
 	/*
-	in->printf(in->udata, "Conts: ");
+	tl_printf(in, "Conts: ");
 	tl_print(in, in->conts);
-	in->printf(in->udata, "\n");
+	tl_printf(in, "\n");
 	*/
 	if(tl_has_error(in)) return 0;
 	if(!cont) return 0;
@@ -88,9 +88,9 @@ int tl_apply_next(tl_interp *in) {
 	callex = tl_first(tl_next(cont));
 	env = tl_next(tl_next(cont));
 #ifdef CONT_DEBUG
-	in->printf(in->udata, "Apply Next len %ld Callex: ", len);
+	tl_printf(in, "Apply Next len %ld Callex: ", len);
 	tl_print(in, callex);
-	in->printf(in->udata, " ");
+	tl_printf(in, " ");
 #endif
 	if(len == TL_APPLY_DROP) {
 		in->values = tl_next(in->values);
@@ -100,7 +100,7 @@ int tl_apply_next(tl_interp *in) {
 		if(tl_push_eval(in, callex, env)) {
 			if(!(len == TL_APPLY_PUSH_EVAL || len == TL_APPLY_DROP_EVAL)) {
 #ifdef CONT_DEBUG
-				in->printf(in->udata, "[indirected]\n");
+				tl_printf(in->udata, "[indirected]\n");
 #endif
 				cont = tl_first(in->conts);
 				in->conts = tl_next(in->conts);
@@ -116,28 +116,28 @@ int tl_apply_next(tl_interp *in) {
 		}
 	} else {
 #ifdef CONT_DEBUG
-		in->printf(in->udata, "[resuming indirect]");
+		tl_printf(in, "[resuming indirect]");
 #endif
 		len = tl_first(tl_next(cont))->ival;
 	}
 #ifdef CONT_DEBUG
-	in->printf(in->udata, "\n");
+	tl_printf(in, "\n");
 #endif
 	tl_values_pop_into(in, callex);
 #ifdef CONT_DEBUG
-	in->printf(in->udata, "Apply Next: %ld call: ", len);
+	tl_printf(in, "Apply Next: %ld call: ", len);
 	tl_print(in, callex);
-	in->printf(in->udata, " values: ");
+	tl_printf(in, " values: ");
 	tl_print(in, in->values);
 	/*
-	in->printf(in->udata, " env: ");
+	tl_printf(in, " env: ");
 	tl_print(in, env);
 	*/
-	in->printf(in->udata, " stack: ");
+	tl_printf(in, " stack: ");
 	for(tl_list_iter(in->conts, ct)) {
 		tl_print(in, tl_new_pair(in, tl_first(ct), tl_first(tl_next(ct))));
 	}
-	in->printf(in->udata, "\n");
+	tl_printf(in, "\n");
 #endif
 	if(len == TL_APPLY_DROP_EVAL) return 1;
 	if(len == TL_APPLY_PUSH_EVAL) {

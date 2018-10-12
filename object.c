@@ -6,7 +6,11 @@
 
 tl_object *tl_new(tl_interp *in) {
 	tl_object *obj = malloc(sizeof(tl_object));
-	assert(obj);
+	if(!obj) {
+		tl_gc(in);
+		obj = malloc(sizeof(tl_object));
+		assert(obj);
+	}
 	obj->next_alloc = in->top_alloc;
 	obj->prev_alloc = NULL;
 	if(in->top_alloc) in->top_alloc->prev_alloc = obj;
@@ -22,13 +26,24 @@ tl_object *tl_new_int(tl_interp *in, long ival) {
 }
 
 tl_object *tl_new_sym(tl_interp *in, const char *str) {
-	tl_object *obj = tl_new(in);
-	obj->kind = TL_SYM;
 	if(str) {
-		obj->str = strdup(str);
+		return tl_new_sym_data(in, str, strlen(str));
 	} else {
-		obj->str = NULL;
+		return tl_new_sym_data(in, NULL, 0);
 	}
+}
+
+tl_object *tl_new_sym_data(tl_interp *in, const char *data, size_t len) {
+	tl_object *obj = tl_new(in);
+	char *copy = NULL;
+	if(len > 0) {
+		copy = malloc(len);
+		memcpy(copy, data, len);
+	}
+	obj->kind = TL_SYM;
+	obj->str = copy;
+	obj->len = len;
+	obj->hash = tl_data_hash(copy, len);
 	return obj;
 }
 
@@ -61,13 +76,13 @@ tl_object *_tl_new_cfunc_byval(tl_interp *in, void (*cfunc)(tl_interp *, tl_obje
 	return obj;
 }
 
-tl_object *tl_new_macro(tl_interp *in, tl_object *args, const char *envn, tl_object *body, tl_object *env) {
+tl_object *tl_new_macro(tl_interp *in, tl_object *args, tl_object *envn, tl_object *body, tl_object *env) {
 	tl_object *obj = tl_new(in);
 	obj->kind = envn ? TL_MACRO : TL_FUNC;
 	obj->args = args;
 	obj->body = body;
 	obj->env = env;
-	obj->envn = envn ? strdup(envn) : NULL;
+	obj->envn = envn;
 	return obj;
 }
 
@@ -99,10 +114,6 @@ void tl_free(tl_interp *in, tl_object *obj) {
 	switch(obj->kind) {
 		case TL_SYM:
 			free(obj->str);
-			break;
-
-		case TL_MACRO:
-			free(obj->envn);
 			break;
 
 		case TL_CFUNC:
@@ -137,6 +148,7 @@ static void _tl_mark_pass(tl_object *obj) {
 			_tl_mark_pass(obj->args);
 			_tl_mark_pass(obj->body);
 			_tl_mark_pass(obj->env);
+			_tl_mark_pass(obj->envn);
 			break;
 
 		case TL_PAIR:
@@ -197,4 +209,22 @@ tl_object *tl_list_rvs(tl_interp *in, tl_object *l) {
 		res = tl_new_pair(in, item, res);
 	}
 	return res;
+}
+
+unsigned long tl_data_hash(const char *data, size_t len) {
+	unsigned long ret = 0, a = 0x848c848c;
+	unsigned char samt;
+	size_t i, end = len > TL_HASH_LINEAR ? TL_HASH_LINEAR : len;
+
+	for(i = 0; i < end; i++) {
+		ret = (ret << 8) | (data[i] ^ (ret >> (sizeof(unsigned long) * 8 - 8)));
+		if(i & 0x1) {
+			ret ^= a;
+			samt = ret & 0xF;
+			a = (a << samt) | (a >> (sizeof(unsigned long) * 8 - samt));
+		}
+		ret = (ret << 8) | (data[len - i - 1] ^ (ret >> (sizeof(unsigned long) * 8 - 8)));
+	}
+
+	return ret;
 }

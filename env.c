@@ -3,12 +3,12 @@
 
 #include "tinylisp.h"
 
-tl_object *tl_env_get_kv(tl_object *env, const char *nm) {
+tl_object *tl_env_get_kv(tl_interp *in, tl_object *env, tl_object *nm) {
 	for(tl_list_iter(env, frame)) {
 		for(tl_list_iter(frame, kv)) {
 			tl_object *key = tl_first(kv);
 			tl_object *val = tl_next(kv);
-			if(key && tl_is_sym(key) && !strcmp(key->str, nm)) {
+			if(key && tl_is_sym(key) && tl_sym_eq(key, nm)) {
 				return kv;
 			}
 		}
@@ -16,8 +16,8 @@ tl_object *tl_env_get_kv(tl_object *env, const char *nm) {
 	return NULL;
 }
 
-tl_object *tl_env_set_global(tl_interp *in, tl_object *env, const char *nm, tl_object *val) {
-	tl_object *kv = tl_env_get_kv(env, nm);
+tl_object *tl_env_set_global(tl_interp *in, tl_object *env, tl_object *nm, tl_object *val) {
+	tl_object *kv = tl_env_get_kv(in, env, nm);
 	if(kv && tl_is_pair(kv)) {
 		kv->next = val;
 		return env;
@@ -25,11 +25,11 @@ tl_object *tl_env_set_global(tl_interp *in, tl_object *env, const char *nm, tl_o
 	if(!env) {
 		env = tl_new_pair(in, TL_EMPTY_LIST, env);
 	}
-	env->first = tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, nm), val), env->first);
+	env->first = tl_new_pair(in, tl_new_pair(in, nm, val), env->first);
 	return env;
 }
 
-tl_object *tl_env_set_local(tl_interp *in, tl_object *env, const char *nm, tl_object *val) {
+tl_object *tl_env_set_local(tl_interp *in, tl_object *env, tl_object *nm, tl_object *val) {
 	if(!env) {
 		env = tl_new_pair(in, TL_EMPTY_LIST, env);
 	}
@@ -37,12 +37,12 @@ tl_object *tl_env_set_local(tl_interp *in, tl_object *env, const char *nm, tl_ob
 	return env;
 }
 
-tl_object *tl_frm_set(tl_interp *in, tl_object *frm, const char *nm, tl_object *val) {
+tl_object *tl_frm_set(tl_interp *in, tl_object *frm, tl_object *nm, tl_object *val) {
 	for(tl_list_iter(frm, kv)) {
-		if(kv && tl_is_pair(kv) && tl_is_sym(tl_first(kv)) && !strcmp(tl_first(kv)->str, nm)) {
+		if(kv && tl_is_pair(kv) && tl_is_sym(tl_first(kv)) && tl_sym_eq(tl_first(kv), nm)) {
 			kv->next = val;
 			return frm;
 		}
 	}
-	return tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, nm), val), frm);
+	return tl_new_pair(in, tl_new_pair(in, nm, val), frm);
 }

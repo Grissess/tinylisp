@@ -78,11 +78,6 @@
 	  v
 	  (f (car l) (foldl f v (cdr l))))))
 
-(define binswap
-  (lambda (f)
-	(lambda (a b)
-	  (f b a))))
-
 ; Mathematics and Logic
 
 (define not
@@ -328,3 +323,32 @@
 	  ((= i 0) (car l))
 	  ((null? l) '())
 	  (else (item (cdr l) (- i 1))))))
+
+; Useful reducers
+
+(define any
+  (lambda (f l)
+	(foldr or #f (map f l))))
+
+(define all
+  (lambda (f l)
+	(foldr and #t (map f l))))
+
+(define id
+  (lambda (x) x))
+
+; Associative list manipulation
+
+(define assoc
+  (lambda (k a)
+	(cond
+	  ((null? a) #f)
+	  ((= k (caar a)) (car a))
+	  (else (assoc k (cdr a))))))
+
+(define del-assoc
+  (lambda (k a)
+	(cond
+	  ((null? a) '())
+	  ((= k (caar a)) (del-assoc k (cdr a)))
+	  (else (cons (car a) (del-assoc k (cdr a)))))))

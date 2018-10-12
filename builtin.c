@@ -13,7 +13,7 @@ int _unboolify(tl_interp *in, tl_object *obj) {
 		return obj->ival;
 	}
 	if(tl_is_sym(obj)) {
-		return strlen(obj->str) > 0;
+		return obj->len > 0;
 	}
 	return 1;
 }
@@ -50,7 +50,7 @@ void tl_cf_macro(tl_interp *in, tl_object *args, tl_object *_) {
 		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "bad macro envname"), envn));
 		tl_cfunc_return(in, in->false_);
 	}
-	tl_cfunc_return(in, tl_new_macro(in, fargs, envn->str, body, in->env));
+	tl_cfunc_return(in, tl_new_macro(in, fargs, envn, body, in->env));
 }
 
 void tl_cf_lambda(tl_interp *in, tl_object *args, tl_object *_) {
@@ -60,7 +60,7 @@ void tl_cf_lambda(tl_interp *in, tl_object *args, tl_object *_) {
 }
 
 void _tl_cf_define_k(tl_interp *in, tl_object *result, tl_object *key) {
-	tl_env_set_local(in, in->env, key->str, tl_first(result));
+	tl_env_set_local(in, in->env, key, tl_first(result));
 	tl_cfunc_return(in, in->true_);
 }
 
@@ -77,9 +77,9 @@ void tl_cf_define(tl_interp *in, tl_object *args, tl_object *_) {
 void tl_cfbv_display(tl_interp *in, tl_object *args, tl_object *_) {
 	for(tl_list_iter(args, arg)) {
 		tl_print(in, arg);
-		if(tl_next(l_arg)) in->printf(in->udata, "\t");
+		if(tl_next(l_arg)) tl_printf(in, "\t");
 	}
-	in->printf(in->udata, "\n");
+	tl_printf(in, "\n");
 	tl_cfunc_return(in, in->true_);
 }
 
@@ -142,7 +142,7 @@ void tl_cf_if(tl_interp *in, tl_object *args, tl_object *_) {
 }
 
 void _tl_cf_set_k(tl_interp *in, tl_object *result, tl_object *key) {
-	tl_env_set_global(in, in->env, key->str, tl_first(result));
+	tl_env_set_global(in, in->env, key, tl_first(result));
 	tl_cfunc_return(in, in->true_);
 }
 
@@ -185,12 +185,13 @@ void tl_cfbv_topenv(tl_interp *in, tl_object *args, tl_object *_) {
 
 void tl_cfbv_concat(tl_interp *in, tl_object *args, tl_object *_) {
 	char *buffer, *end, *src;
-	size_t sz = 0;
+	size_t sz = 0, rsz;
 	for(tl_list_iter(args, val)) {
 		verify_type(in, val, sym, "concat");
-		sz += strlen(val->str);
+		sz += val->len;
 	}
-	end = buffer = malloc(sz + 1);
+	rsz = sz;
+	end = buffer = malloc(sz);
 	if(!buffer) tl_error_set(in, tl_new_sym(in, "out of memory"));
 	for(tl_list_iter(args, val)) {
 		src = val->str;
@@ -199,14 +200,13 @@ void tl_cfbv_concat(tl_interp *in, tl_object *args, tl_object *_) {
 			sz--;
 		}
 	}
-	*end = 0;
-	tl_cfunc_return(in, tl_new_sym(in, buffer));
+	tl_cfunc_return(in, tl_new_sym_data(in, buffer, sz));
 }
 
 void tl_cfbv_length(tl_interp *in, tl_object *args, tl_object *_) {
 	arity_1(in, args, "length");
 	verify_type(in, tl_first(args), sym, "length");
-	tl_cfunc_return(in, tl_new_int(in, strlen(tl_first(args)->str)));
+	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->len));
 }
 
 void tl_cfbv_add(tl_interp *in, tl_object *args, tl_object *_) {
@@ -278,7 +278,7 @@ void tl_cfbv_eq(tl_interp *in, tl_object *args, tl_object *_) {
 		tl_cfunc_return(in, _boolify(a->ival == b->ival));
 	}
 	if(tl_is_sym(a) && tl_is_sym(b)) {
-		tl_cfunc_return(in,  _boolify(!strcmp(a->str, b->str)));
+		tl_cfunc_return(in, _boolify(tl_sym_eq(a, b)));
 	}
 	tl_cfunc_return(in, _boolify(a == b));
 }
@@ -289,7 +289,7 @@ void tl_cfbv_less(tl_interp *in, tl_object *args, tl_object *_) {
 		tl_cfunc_return(in, _boolify(a->ival < b->ival));
 	}
 	if(tl_is_sym(a) && tl_is_sym(b)) {
-		tl_cfunc_return(in, _boolify(strcmp(a->str, b->str) < 0));
+		tl_cfunc_return(in, _boolify(tl_sym_less(a, b)));
 	}
 	tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "incomparable types"), a), b));
 	tl_cfunc_return(in, in->false_);
@@ -335,3 +335,17 @@ void tl_cfbv_gc(tl_interp *in, tl_object *args, tl_object *_) {
 void tl_cfbv_read(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_read(in, TL_EMPTY_LIST));
 }
+
+#ifdef CONFIG_MODULES
+void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
+	tl_object *name = tl_first(args);
+	if(!tl_is_sym(name)) {
+		tl_cfunc_return(in, in->false_);
+	}
+	tl_cfunc_return(in, _boolify(in->modloadf(in->udata, in, name->str)));
+}
+#else
+void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
+	tl_cfunc_return(in, in->false_);
+}
+#endif
