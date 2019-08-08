@@ -209,6 +209,39 @@ void tl_cfbv_length(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->len));
 }
 
+void tl_cfbv_ord(tl_interp *in, tl_object *args, tl_object *_) {
+	arity_n(in, args, 2, "ord");
+	verify_type(in, tl_first(args), sym, "ord");
+	verify_type(in, tl_first(tl_next(args)), int, "ord");
+	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->str[tl_first(tl_next(args))->ival]));
+}
+
+void tl_cfbv_chr(tl_interp *in, tl_object *args, tl_object *_) {
+	char s[2] = {};
+	arity_1(in, args, "chr");
+	verify_type(in, tl_first(args), int, "chr");
+	s[0] = (char) tl_first(args)->ival;
+	tl_cfunc_return(in, tl_new_sym(in, s));
+}
+
+void tl_cfbv_readc(tl_interp *in, tl_object *args, tl_object *_) {
+	tl_cfunc_return(in, tl_new_int(in, tl_getc(in)));
+}
+
+void tl_cfbv_putbackc(tl_interp *in, tl_object *args, tl_object *_) {
+	arity_1(in, args, "putback");
+	verify_type(in, tl_first(args), int, "putback");
+	tl_putback(in, tl_first(args)->ival);
+	tl_cfunc_return(in, in->true_);
+}
+
+void tl_cfbv_writec(tl_interp *in, tl_object *args, tl_object *_) {
+	arity_1(in, args, "write");
+	verify_type(in, tl_first(args), int, "write");
+	tl_putc(in, tl_first(args)->ival);
+	tl_cfunc_return(in, in->true_);
+}
+
 void tl_cfbv_add(tl_interp *in, tl_object *args, tl_object *_) {
 	long res = 0;
 	for(tl_list_iter(args, val)) {

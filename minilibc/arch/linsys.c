@@ -41,7 +41,7 @@ void arch_fputc(unsigned long hdl, char c) {
 	if(fd < 0) return;
 
 	register void *sysno asm ("rax") = (void *) SYS_WRITE;
-	register void *fdesc asm ("rdi") = (void *) fd;
+	register void *fdesc asm ("rdi") = (void *) (size_t) fd;  // Double cast squelches a warning
 	register void *buf asm ("rsi") = (void *) &c;
 	register void *sz asm ("rdx") = (void *) 1;
 	register void *ret asm ("rax");
@@ -55,7 +55,7 @@ int arch_fgetc(unsigned long hdl) {
 	if(fd < 0) return EOF;
 
 	register void *sysno asm ("rax") = (void *) SYS_READ;
-	register void *fdesc asm ("rdi") = (void *) fd;
+	register void *fdesc asm ("rdi") = (void *) (size_t) fd;
 	register void *buf asm ("rsi") = (void *) &c;
 	register void *sz asm ("rdx") = (void *) 1;
 	register void *ret asm ("rax");

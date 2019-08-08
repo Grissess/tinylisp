@@ -1,4 +1,6 @@
 *.o
+*.so
 tl
+a.out
 *.tar.xz
 /doc

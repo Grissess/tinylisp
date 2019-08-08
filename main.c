@@ -16,10 +16,16 @@ void my_writef(void *_, tl_interp *in, const char c) {
 #ifdef CONFIG_MODULES
 #include <dlfcn.h>
 int my_modloadf(void *_, tl_interp *in, const char *fname) {
-	void *hdl = dlopen(fname, RTLD_LAZY | RTLD_GLOBAL);
-	if(!hdl) return 0;
+	void *hdl = dlopen(fname, RTLD_NOW | RTLD_GLOBAL);
+	if(!hdl) {
+		tl_printf(in, "Module load error: %s\n", dlerror());
+		return 0;
+	}
 	void *ini = dlsym(hdl, "tl_init");
-	if(!ini) return 0;
+	if(!ini) {
+		tl_printf(in, "Module init error: %s\n", dlerror());
+		return 0;
+	}
 	return (*(int (**)(tl_interp *, const char *))(&ini))(in, fname);
 }
 #endif
@@ -38,6 +44,11 @@ void _main_k(tl_interp *in, tl_object *result, tl_object *_) {
 	tl_cfunc_return(in, in->true_);
 }
 
+#ifdef CONFIG_MODULES_BUILTIN
+extern void *_TL_BUILTIN_MODULES_START;
+extern void *_TL_BUILTIN_MODULES_END;
+#endif
+
 int main() {
 	tl_interp in;
 	tl_object *expr, *val;
@@ -49,6 +60,13 @@ int main() {
 	in.writef = my_writef;
 #ifdef CONFIG_MODULES
 	in.modloadf = my_modloadf;
+#endif
+#ifdef CONFIG_MODULES_BUILTIN
+	{
+		int (**fp)(tl_interp *, const char *) = (int (**)(tl_interp *, const char *))&_TL_BUILTIN_MODULES_START;
+		while(fp != (int (**)(tl_interp *, const char *))&_TL_BUILTIN_MODULES_END)
+			(*fp++)(&in, NULL);
+	}
 #endif
 
 	fprintf(stderr, "Top Env: ");

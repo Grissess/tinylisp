@@ -40,6 +40,12 @@ void tl_interp_init(tl_interp *in) {
 
 	top_frm = _tl_frm_set("tl-concat", tl_new_cfunc_byval(in, tl_cfbv_concat), top_frm);
 	top_frm = _tl_frm_set("tl-length", tl_new_cfunc_byval(in, tl_cfbv_length), top_frm);
+	top_frm = _tl_frm_set("tl-ord", tl_new_cfunc_byval(in, tl_cfbv_ord), top_frm);
+	top_frm = _tl_frm_set("tl-chr", tl_new_cfunc_byval(in, tl_cfbv_chr), top_frm);
+
+	top_frm = _tl_frm_set("tl-readc", tl_new_cfunc_byval(in, tl_cfbv_readc), top_frm);
+	top_frm = _tl_frm_set("tl-putbackc", tl_new_cfunc_byval(in, tl_cfbv_putbackc), top_frm);
+	top_frm = _tl_frm_set("tl-writec", tl_new_cfunc_byval(in, tl_cfbv_writec), top_frm);
 
 	top_frm = _tl_frm_set("tl-+", tl_new_cfunc_byval(in, tl_cfbv_add), top_frm);
 	top_frm = _tl_frm_set("tl--", tl_new_cfunc_byval(in, tl_cfbv_sub), top_frm);
