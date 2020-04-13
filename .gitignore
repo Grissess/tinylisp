@@ -4,3 +4,5 @@ tl
 a.out
 *.tar.xz
 /doc
+/doc_html
+/doxyxml

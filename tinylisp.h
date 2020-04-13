@@ -18,6 +18,13 @@
 #endif
 
 #if defined(MODULE) && !defined(MODULE_BUILTIN)
+/** `extern` keyword used throughout the header
+ *
+ * This is set to `extern` whenever the current source (.c) file is being
+ * linked as a shared object (DLL), indicating to the compiler that the names
+ * in this library are external (because they are in the interpreter which
+ * loads them). It is defined as an empty string otherwise.
+ */
 #define TL_EXTERN extern
 #else
 #define TL_EXTERN
@@ -36,14 +43,23 @@ typedef struct tl_interp_s tl_interp;
 typedef struct tl_object_s {
 	/** The type of this object. Instead of testing this directly, you should prefer the `tl_is_*` macros instead. */
 	enum {
+		/** Integer objects (C long). */
 		TL_INT,
+		/** Symbol objects (loosely, strings, but not C strings). */
 		TL_SYM,
+		/** A `cons` pair. */
 		TL_PAIR,
+		/** A C continuation; the object C code pushes on the stack to defer evaluation. */
 		TL_THEN,
+		/** A built-in function taking arguments by name. */
 		TL_CFUNC,
+		/** A built-in function taking arguments by value. */
 		TL_CFUNC_BYVAL,
+		/** A user-defined function taking arguments (and an environment) by name. */
 		TL_MACRO,
+		/** A user-defined function taking arguments by value. */
 		TL_FUNC,
+		/** A continuation object; the object passed by `call-with-current-continuation`, which resumes evaluation state. */
 		TL_CONT,
 	} kind;
 	union {
@@ -175,54 +191,302 @@ TL_EXTERN tl_object *tl_new_cont(tl_interp *, tl_object *, tl_object *, tl_objec
 TL_EXTERN void tl_free(tl_interp *, tl_object *);
 TL_EXTERN void tl_gc(tl_interp *);
 
+/** Test whether an object is a TL_INT. */
 #define tl_is_int(obj) ((obj) && (obj)->kind == TL_INT)
+/** Test whether an object is a TL_SYM. */
 #define tl_is_sym(obj) ((obj) && (obj)->kind == TL_SYM)
 /* FIXME: NULL is a valid empty list */
 /** Test whether an object is a pair. Note that NULL and TL_EMPTY_LIST are
  *   equivalent, so NULL is a valid pair.
  */
 #define tl_is_pair(obj) (!(obj) || (obj)->kind == TL_PAIR)
+/** Test whether an object is a TL_THEN. */
 #define tl_is_then(obj) ((obj) && (obj)->kind == TL_THEN)
+/** Test whether an object is a TL_CFUNC. */
 #define tl_is_cfunc(obj) ((obj) && (obj)->kind == TL_CFUNC)
+/** Test whether an object is a TL_CFUNC_BYVAL. */
 #define tl_is_cfunc_byval(obj) ((obj) && (obj)->kind == TL_CFUNC_BYVAL)
+/** Test whether an object is a TL_MACRO. */
 #define tl_is_macro(obj) ((obj) && (obj)->kind == TL_MACRO)
+/** Test whether an object is a TL_FUNC. */
 #define tl_is_func(obj) ((obj) && (obj)->kind == TL_FUNC)
+/** Test whether an object is a TL_CONT. */
 #define tl_is_cont(obj) ((obj) && (obj)->kind == TL_CONT)
+/** Test whether an object is callable; that is, it can be on the left side of
+ *   an application.
+ *
+ *   Currently, the list includes TL_CFUNC, TL_CFUNC_BYVAL, TL_THEN, TL_MACRO, TL_FUNC, and TL_CONT.
+ */
 #define tl_is_callable(obj) (tl_is_cfunc(obj) || tl_is_cfunc_byval(obj) || tl_is_then(obj)|| tl_is_macro(obj) || tl_is_func(obj) || tl_is_cont(obj))
 
+/** Get the first of a pair (`car`).
+ *
+ * If the pair is empty, or the object not a pair, TL_EMPTY_LIST is returned.
+ */
 #define tl_first(obj) (((obj) && tl_is_pair(obj)) ? (obj)->first : NULL)
+/** Get the next of a pair (`cdr`).
+ *
+ * If the pair is empty, or the object not a pair, TL_EMPTY_LIST is returned.
+ */
 #define tl_next(obj) (((obj) && tl_is_pair(obj)) ? (obj)->next : NULL)
 
+/** The value of an empty list.
+ *
+ * Pragmatically, this value is NULL, which means that NULL pointers show up in
+ * many structures, and some of TinyLISP is written with this assumption. In
+ * effect, NULL := `()`.
+ */
 #define TL_EMPTY_LIST NULL
 
+/** Iterate over a list.
+ *
+ * This macro is written to be used inside the parentheses of a for loop,
+ * followed by a statement (or block). The argument `obj` is a `TL_PAIR`
+ * containing a "proper list" (a linked list of pairs where the first is the
+ * value and the next is a pair, or TL_EMPTY_LIST). `it` is a variable name
+ * which is defined in the scope as the "current item" of the iterator (the
+ * first of each pair). Additionally, `l_it` (the name prefixed with `l_`) is
+ * defined as the current pair (such that `tl_first(l_it) == it`).
+ */
 #define tl_list_iter(obj, it) tl_object *l_##it = obj, *it = tl_first(obj); l_##it; l_##it = tl_next(l_##it), it = tl_first(l_##it)
 TL_EXTERN size_t tl_list_len(tl_object *);
 TL_EXTERN tl_object *tl_list_rvs(tl_interp *, tl_object *);
 
+/** A tuning threshold for hashing.
+ *
+ * Only the first `TL_HASH_LINEAR` bytes of a symbol are hashed.
+ */
 #define TL_HASH_LINEAR 16
 TL_EXTERN unsigned long tl_data_hash(const char *, size_t);
 
+/** Determine if two symbols are equal.
+ *
+ * This checks, in the following order, in theory from least to most expensive:
+ * - whether `a` and `b` are both TL_SYM;
+ * - whether their lengths are the same;
+ * - whether their stored hashes are the same;
+ * - their byte-for-byte equality.
+ */
 #define tl_sym_eq(a, b) (tl_is_sym(a) && tl_is_sym(b) && (a)->len == (b)->len && (a)->hash == (b)->hash && !memcmp(a->str, b->str, a->len))
-#define tl_sym_less(a, b) (tl_is_sym(a) && tl_is_sym(b) && ((a)->len < (b)->len || memcmp((a)->str, (b)->str, (a)->len) < 0))
+/** Determine if one symbol is "less than" another.
+ *
+ * The ordering used here is "shortlex"; `a < b` is implied by, in order:
+ * - the length of `a` being less than `b`, or:
+ * - if the two symbols are of equal length, whichever has the first byte which
+ *   is lesser in numeric value is less.
+ *
+ * This is a partial order; if `a` and `b` are not TL_SYM, this is always
+ * false. It is never true when `tl_sym_eq(a, b)`.
+ */
+#define tl_sym_less(a, b) (tl_is_sym(a) && tl_is_sym(b) && ((a)->len < (b)->len && !((b)->len < (a)->len) || memcmp((a)->str, (b)->str, (a)->len) < 0))
 
+/** The interpreter structure.
+ *
+ * This represents the state of the TinyLISP interpreter at any given point in
+ * time. Multiple interpreters can exist simultaneously; TinyLISP is fully
+ * reentrant.
+ *
+ * After allocating space for one, an interpreter is initialized using
+ * `tl_interp_init` (though some other tasks follow this call; see that
+ * function for details). It is finalized with `tl_interp_cleanup`, after which
+ * point it is no longer valid. Between these two calls, a library can call any
+ * evaluation functions (usually `tl_eval_and_then`), and surrender control to
+ * the TinyLISP evaluator to eventually call a continuation with
+ * `tl_run_until_done`. See the REPL in `main.c` for an example.
+ *
+ * TinyLISP code can and does modify many of the fields of this structure (some
+ * of which do not make sense outside of the evaluation context provided by
+ * `tl_run_until_done`), but it is safe for C code to modify them outside of an
+ * evaluation context generally without data races.
+ */
 struct tl_interp_s {
+	/** The initial environment of the interpreter.
+	 *
+	 * This is initialized to an environment containing all of the builtin
+	 * top-level functions provided by TinyLISP. See the user guide for this
+	 * enumeration.
+	 */
 	tl_object *top_env;
+	/** The current environment of the interpreter.
+	 *
+	 * This is initialized to point to `top_env`; however, an environment is
+	 * pushed whenever a user-defined callable is invoked, and restored by
+	 * continuations. This member is most useful from within built-in
+	 * functions, where its value represents the current environment (or
+	 * namespace) of evaluation.
+	 */
 	tl_object *env;
+	/** The "true" object.
+	 *
+	 * As an implementation detail, it is the symbol `tl-#t`. It never needs to
+	 * be allocated or initialized; for the lifetime of an interpreter, it can
+	 * be returned directly from this field.
+	 *
+	 * Many C functions return this value to indicate they have succeeded, if
+	 * they have no other value to return.
+	 */
 	tl_object *true_;
+	/** The "false" object.
+	 *
+	 * This is, like `true_`, just the symbol `tl-#f`, and likewise does not
+	 * need to be allocated.
+	 *
+	 * Other than predicate functions, this is returned from some C functions
+	 * to indicate failure.
+	 */
 	tl_object *false_;
+	/** The current error.
+	 *
+	 * If a fatal error in evaluation occurs, the evaluator sets this to some
+	 * significant value (usually a symbol or a list of some kind, possibly
+	 * improper). This generally aborts the entire evaluation back into the C
+	 * stack, causing `tl_run_until_done` to return. C interface code should
+	 * check the error state via `tl_has_error`; if it is set, the value stack
+	 * is likely to be in a less-than-useful state for the invocation.
+	 *
+	 * When no error has occurred, this field is TL_EMPTY_LIST (or,
+	 * equivalently, NULL).
+	 */
 	tl_object *error;
+	/** A registered list of parser prefices.
+	 *
+	 * The parser (`tl_read`) maintains a list of special characters which can
+	 * precede another expression and be translated into an application. This
+	 * is, for example, implemented by `std.tl` to turn `'expr` into `(quote
+	 * expr)`. Other prefices, including quasiquoting, are implemented this
+	 * way, though (as an implementation detail) only one character is allowed
+	 * to be used as a prefix.
+	 *
+	 * The built-in function `tl-prefix` registers a new prefix into this
+	 * table. C code can safely do so as well. The list is initially empty, and
+	 * is populated as a proper list (in the LISP sense) containing pairs of
+	 * symbols (whose first character is exclusively checked) to names (also
+	 * symbols), which are substituted into the application `(name expr)` by
+	 * the parser at the site in which they are encountered. No other lexical
+	 * processing is done.
+	 */
 	tl_object *prefixes;
+	/** The most-recently allocated object.
+	 *
+	 * This is used by the GC as the first item in a linked list through
+	 * allocated objects, to scan the entire set of allocations.
+	 */
 	tl_object *top_alloc;
+	/** The "continuation stack".
+	 *
+	 * This is most directly accessed via `tl_push_apply` for pushes, and
+	 * popped by `tl_apply_next` (which may, in the course of evaluation,
+	 * `tl_push_apply` more continuations.
+	 *
+	 * One can think of this stack as the "call stack" or "expression stack" of
+	 * the interpreter; it consists of callables, intermingled with some
+	 * special values which manipulate the value stack. For example, when a
+	 * user-declared lambda is evaluated, its body is pushed onto this stack in
+	 * reverse order (so that the top is the first expression), and all but the
+	 * last expression's values are dropped.
+	 *
+	 * The data structures inside of this stack are implementation details and
+	 * subject to change; full documentation of their structure is outside the
+	 * scope of this field's documentation.
+	 */
 	tl_object *conts;
+	/** The "value stack".
+	 *
+	 * This is most directly accessed by `tl_values_push` (including via
+	 * `tl_cfunc_return`) and `tl_values_push_syntactic`, and by the evaluator
+	 * using `tl_values_pop_into`. Most C continuations see the values passed
+	 * to them as their second arugment, thus not needing to access this stack
+	 * directly; if the C function is "by value" (`TL_CFUNC_BYVAL`), the
+	 * arguments received for the second parameter consist of the values as
+	 * already evaluated (from syntactic to direct).
+	 *
+	 * The data structure inside of this stack is an implementation detail and
+	 * subject to change; however, it is stably a proper LISP list of pairs,
+	 * with the first being the value and the second being either `true_` for a
+	 * syntactic value or `false_` for a direct value. A discussion of the
+	 * difference between syntactic and direct values is outside the scope of
+	 * this field's documentation.
+	 */
 	tl_object *values;
+	/** The number of "events" before `tl_gc` is automatically called by `tl_push_apply`.
+	 *
+	 * Note that this happens regardless of memory pressure. A smarter
+	 * implementation with feedback on memory usage (e.g., through its malloc()
+	 * information interface or an OS interface) might wish to call `tl_gc`
+	 * manually whenever it experiences memory pressure for better performance.
+	 *
+	 * To disable automatic GC (and become responsible for calling `tl_gc`
+	 * manually), set this to 0.
+	 */
 	size_t gc_events;
+	/** The "event counter" compared to `gc_events`.
+	 *
+	 * This is incremented by `tl_push_apply`.
+	 */
 	size_t ctr_events;
+	/** The value of the last "putback" (like stdio's ungetc). */
 	int putback;
+	/** Whether or not `tl_getc` will return the last "putback". */
 	int is_putback;
+	/** An opaque "user data" pointer used for interface functions.
+	 *
+	 * This value is stored but never modified by TinyLISP; it is not even
+	 * initialized by `tl_interp_init`, but this is usually safe since core
+	 * TinyLISP never accesses the referent of this pointer.
+	 *
+	 * It is passed as the first argument to the interface functions, when
+	 * TinyLISP needs to "upcall" back into the environment using function
+	 * pointers stored in the interpreter.
+	 */
 	void *udata;
+	/** Function to read a character.
+	 *
+	 * This is expected to return a C character (a byte) cast to an integer. If
+	 * the stream is closed, it is valid to return `EOF` (defined in this or
+	 * stdio).
+	 *
+	 * The arguments are the `udata` field and the current interpreter.
+	 *
+	 * An entirely valid implementation relying on stdio can simply `return
+	 * getchar()`.
+	 */
 	int (*readf)(void *, struct tl_interp_s *);
+	/** Function to write a character.
+	 *
+	 * This function is called to output a byte of output from TinyLISP to
+	 * present to the user.
+	 *
+	 * The arguments are the `udata` field, the current interpreter, and the
+	 * character that is to be output.
+	 *
+	 * An entirely valid implementation relying on stdio can simply
+	 * `putchar(c)` where `c` is the third argument.
+	 */
 	void (*writef)(void *, struct tl_interp_s *, char);
 #ifdef CONFIG_MODULES
+	/** Function to load a module.
+	 *
+	 * This function is expected to "load a module" into the interpreter.
+	 * Naturally, platforms can differ greatly on how this is done, so TinyLISP
+	 * leaves most of the details to this function.
+	 *
+	 * The arguments are the `udata` field, the current interpreter, and the
+	 * symbol passed to `tl-modload` converted to a NUL-terminated C string.
+	 * The return value is usually nonzero if it succeeded, or zero if it
+	 * failed.
+	 *
+	 * Generally, the modules built in this source tree export a symbol
+	 * `tl_init` which is supposed to be called after loading the module into
+	 * the current virtual memory space. The value that `tl_init` returns (an
+	 * int) can safely be returned from this function. (`tl_init` usually
+	 * modifies `top_env` to contain more built-in functions.)
+	 * 
+	 * Other failures, such as failing to find the module, shouldn't result in
+	 * fatal errors (setting `tl_has_error`), but simply return 0.
+	 *
+	 * A valid implementation for a platform which does not support module
+	 * loading may simply always `return 0`.
+	 */
 	int (*modloadf)(void *, struct tl_interp_s *, const char *);
 #endif
 };
@@ -230,12 +494,42 @@ struct tl_interp_s {
 TL_EXTERN void tl_interp_init(tl_interp *);
 TL_EXTERN void tl_interp_cleanup(tl_interp *);
 
+/** Set the error state of the interpreter.
+ *
+ * As an important implementation detail, the error state cannot be an empty
+ * list, which is indistinguishable from "no error".
+ *
+ * Errors are not well-defined or catalogued, and their exact text is an
+ * implementation detail and subject to change. Cautious TinyLISP programs
+ * should proactively avoid errors for maximum compatibility. Programs can also
+ * raise errors using the `tl-error` builtin function.
+ */
 #define tl_error_set(in, er) ((in)->error ? (er) : ((in)->error = (er)))
+/** Clear the error state of the interpreter. */
 #define tl_error_clear(in) ((in)->error = NULL)
+/** Evaluates to whether or not the interpreter has an error state. */
 #define tl_has_error(in) ((in)->error)
 
+/** Gets a character from the interpreter's input stream.
+ *
+ * This is most often called via `tl_read`; however, programs can also access
+ * this function via `tl-readc`.
+ *
+ * This only reads from the backing store (`readf`) if a "putback" isn't set;
+ * if one is set, that putback is returned instead.
+ */
 #define tl_getc(in) ((in)->is_putback ? ((in)->is_putback = 0, (in)->putback) : (in)->readf((in)->udata, (in)))
+/** Put back a character to be read again with `tl_getc`, like `ungetc` in stdio.
+ *
+ * TinyLISP only stores one putback character at a time.
+ */
 #define tl_putback(in, c) ((in)->is_putback = 1, (in)->putback = (c))
+/** Put a character on the output stream.
+ *
+ * This usually just invokes `writef` on the interpreter. The usual C functions
+ * are `tl_puts`, `tl_print`, `tl_write`, and `tl_printf`, sometimes also
+ * called via TinyLISP programs (e.g., `tl-display`).
+ */
 #define tl_putc(in, c) ((in)->writef((in)->udata, (in), (c)))
 
 TL_EXTERN tl_object *tl_env_get_kv(tl_interp *, tl_object *, tl_object *);
@@ -287,24 +581,79 @@ TL_EXTERN void tl_puts(tl_interp *, const char *);
 TL_EXTERN void tl_write(tl_interp *, const char *, size_t);
 TL_EXTERN void tl_printf(tl_interp *, const char *, ...);
 
+/** Push a direct value onto the value stack of the interpreter.
+ *
+ * Direct values should already be evaluated, and will not be evaluated again
+ * if needed in a value position. It is an error for a direct value to appear
+ * in a name position.
+ */
 #define tl_values_push(in, v) (in)->values = tl_new_pair((in), tl_new_pair((in), (v), (in)->false_), (in)->values)
+/** Push a syntactic value onto the value stack of the interpreter.
+ *
+ * Syntactic values may be evaluated if they are found in a value (not name)
+ * position.
+ */
 #define tl_values_push_syntactic(in, v) (in)->values = tl_new_pair((in), tl_new_pair((in), (v), (in)->true_), (in)->values)
+/** Pop a value off the value stack and into a `tl_object *` variable named `var`.
+ *
+ * This routine is deprecated because it discards the syntactic/direct flag.
+ */
 #define tl_values_pop_into(in, var) do { \
 	var = tl_first(tl_first((in)->values)); \
 	(in)->values = tl_next((in)->values); \
 } while(0)
+/** Return a value from a C function.
+ *
+ * All C functions must return a value (`true_` is a good candidate if no other
+ * value makes sense). This macro encapsulates both pushing that value onto the
+ * value stack and ending control flow (it contains `return`).
+ *
+ * Although the C compiler might not catch it, anything after this invocation
+ * is dead code.
+ */
 #define tl_cfunc_return(in, v) do { tl_values_push((in), (v)); return; } while(0)
 TL_EXTERN int tl_push_eval(tl_interp *, tl_object *, tl_object *);
+/** A special continuation flag for pushing an expression to be evaluated onto the stack.
+ *
+ * This is specifically done with the tail-position expression for a
+ * user-defined callable.
+ */
 #define TL_APPLY_PUSH_EVAL -1
+/** A special continuation flag for popping the callable off the value stack.
+ *
+ * When tl_push_eval returns true, it indicates that an application to be
+ * evaluated needs another evaluation to determine the callable (e.g., `((begin
+ * display) 7)`). To mark this case, `tl_apply_next` puts this value on the
+ * continuation stack to indicate that the value pushes for the next evaluation
+ * (queued by `tl_push_apply` is to be used as a callable for the next
+ * application. The current application is said to be "suspended", and will be
+ * "resumed" after the callable value is available.
+ */
 #define TL_APPLY_INDIRECT -2
+/** A special continuation flag for evaluating, but not pushing, an evaluation of an expression.
+ *
+ * This is specifically done with all non-tail-position expressions for a
+ * user-defined callable.
+ */
 #define TL_APPLY_DROP_EVAL -3
+/** A special continuation flag that simply drops the top of the value stack and continues.
+ *
+ * This needs to be left when a TL_APPLY_DROP_EVAL evaluation is indirected,
+ * which is a rare circumstance.
+ */
 #define TL_APPLY_DROP -4
 TL_EXTERN void tl_push_apply(tl_interp *, long, tl_object *, tl_object *);
 TL_EXTERN int tl_apply_next(tl_interp *);
 TL_EXTERN void _tl_eval_and_then(tl_interp *, tl_object *, tl_object *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
+/** Invokes `_tl_eval_and_then` with the stringified name of the callback. */
 #define tl_eval_and_then(in, ex, st, cb) _tl_eval_and_then((in), (ex), (st), (cb), "tl_eval_and_then:" #cb)
 TL_EXTERN void _tl_eval_all_args(tl_interp *, tl_object *, tl_object *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
+/** Invokes `_tl_eval_all_args` with the stringified name of the callback. */
 #define tl_eval_all_args(in, args, state, cb) _tl_eval_all_args((in), (args), (state), (cb), "tl_eval_all_args:" #cb)
+/** Runs an interpreter with one or more pushed evaluations until all evaulation is finished or an error occurs.
+ *
+ * This simply calls `tl_apply_next` in a loop until it returns false.
+ */
 #define tl_run_until_done(in) while(tl_apply_next((in)))
 
 TL_EXTERN void tl_cfbv_evalin(tl_interp *, tl_object *, tl_object *);

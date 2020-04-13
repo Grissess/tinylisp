@@ -51,7 +51,7 @@ dist: tinylisp.tar.xz
 
 docs: Doxyfile
 	doxygen Doxyfile
-	sphinx-build -b html . ./doc
+	sphinx-build -b html . ./doc_html
 
 tinylisp.tar.xz: tinylisp.tar
 	rm $@ || true

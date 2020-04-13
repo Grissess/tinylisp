@@ -40,7 +40,7 @@ int tl_push_eval(tl_interp *in, tl_object *expr, tl_object *env) {
 void tl_push_apply(tl_interp *in, long len, tl_object *expr, tl_object *env) {
 	in->conts = tl_new_pair(in, tl_new_pair(in, tl_new_int(in, len), tl_new_pair(in, expr, env)), in->conts);
 	in->ctr_events++;
-	if(in->ctr_events >= in->gc_events) {
+	if(in->gc_events > 0 && in->ctr_events >= in->gc_events) {
 		tl_gc(in);
 		in->ctr_events = 0;
 	}
@@ -100,7 +100,7 @@ int tl_apply_next(tl_interp *in) {
 		if(tl_push_eval(in, callex, env)) {
 			if(!(len == TL_APPLY_PUSH_EVAL || len == TL_APPLY_DROP_EVAL)) {
 #ifdef CONT_DEBUG
-				tl_printf(in->udata, "[indirected]\n");
+				tl_printf(in, "[indirected]\n");
 #endif
 				cont = tl_first(in->conts);
 				in->conts = tl_next(in->conts);

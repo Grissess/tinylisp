@@ -1,6 +1,21 @@
 #include "tinylisp.h"
 
+/** An internal macro for creating a new binding inside of a frame. */
 #define _tl_frm_set(sm, obj, fm) tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, sm), obj), fm)
+
+/** Initialize a TinyLISP interpreter.
+ *
+ * This function properly initializes the fields of a `tl_interp`, after which
+ * the interpreter may be considered valid, and can run evaluations. (It is
+ * undefined behavior to use an interpreter before it is initialized.)
+ *
+ * The source for this function is a logical place to add more language
+ * builtins if a module would not suffice.
+ *
+ * Some initialization MUST follow this; for example, TinyLISP's `tl_interp`
+ * needs a valid `readf` and `writef` field before use. See the field
+ * documentation for initializing those fields.
+ */
 void tl_interp_init(tl_interp *in) {
 	in->top_alloc = NULL;
 	in->true_ = tl_new_sym(in, "tl-#t");
@@ -77,6 +92,12 @@ void tl_interp_init(tl_interp *in) {
 	in->env = in->top_env;
 }
 
+/** Finalizes a module.
+ *
+ * For the most part, this frees all memory allocated by the interpreter,
+ * leaving many of its pointers dangling. It is undefined behavior to use an
+ * interpreter after it has been finalized.
+ */
 void tl_interp_cleanup(tl_interp *in) {
 	while(in->top_alloc) {
 		tl_free(in, in->top_alloc);

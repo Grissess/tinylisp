@@ -285,8 +285,8 @@ size_t tl_list_len(tl_object *l) {
 /** Reverses a list.
  *
  * This builds a list by pushing elements onto a running stack (another list)
- * in the order they are traversed, so it requires no extra space. It is,
- * however, linear time.
+ * in the order they are traversed, so it requires no extra space (beyond the
+ * allocation of the returned list). It is, however, linear time.
  */
 tl_object *tl_list_rvs(tl_interp *in, tl_object *l) {
 	tl_object *res = TL_EMPTY_LIST;

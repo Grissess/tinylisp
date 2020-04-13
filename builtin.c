@@ -195,12 +195,13 @@ void tl_cfbv_concat(tl_interp *in, tl_object *args, tl_object *_) {
 	if(!buffer) tl_error_set(in, tl_new_sym(in, "out of memory"));
 	for(tl_list_iter(args, val)) {
 		src = val->str;
-		while(sz > 0 && *src) {
+		sz = val->len;
+		while(sz > 0) {
 			*end++ = *src++;
 			sz--;
 		}
 	}
-	tl_cfunc_return(in, tl_new_sym_data(in, buffer, sz));
+	tl_cfunc_return(in, tl_new_sym_data(in, buffer, rsz));
 }
 
 void tl_cfbv_length(tl_interp *in, tl_object *args, tl_object *_) {
@@ -372,10 +373,18 @@ void tl_cfbv_read(tl_interp *in, tl_object *args, tl_object *_) {
 #ifdef CONFIG_MODULES
 void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_object *name = tl_first(args);
+	char *name_cstr;
+	tl_object *ret;
+
 	if(!tl_is_sym(name)) {
 		tl_cfunc_return(in, in->false_);
 	}
-	tl_cfunc_return(in, _boolify(in->modloadf(in->udata, in, name->str)));
+	name_cstr = malloc(name->len + 1);
+	memcpy(name_cstr, name->str, name->len);
+	name_cstr[name->len] = 0;
+	ret = _boolify(in->modloadf(in->udata, in, name_cstr));
+	free(name_cstr);
+	tl_cfunc_return(in, ret);
 }
 #else
 void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
