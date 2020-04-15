@@ -19,11 +19,6 @@ char *strcpy(char *dest, const char *src) {
 	return dest;
 }
 
-char *strdup(const char *c) {
-	char *r = malloc(strlen(c) + 1);
-	return strcpy(r, c);
-}
-
 char *strpbrk(const char *s, const char *c) {
 	const char *t;
 	while(*s) {

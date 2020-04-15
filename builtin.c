@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #include "tinylisp.h"
 
@@ -191,7 +192,7 @@ void tl_cfbv_concat(tl_interp *in, tl_object *args, tl_object *_) {
 		sz += val->len;
 	}
 	rsz = sz;
-	end = buffer = malloc(sz);
+	end = buffer = tl_alloc_malloc(in, sz);
 	if(!buffer) tl_error_set(in, tl_new_sym(in, "out of memory"));
 	for(tl_list_iter(args, val)) {
 		src = val->str;
@@ -379,10 +380,11 @@ void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
 	if(!tl_is_sym(name)) {
 		tl_cfunc_return(in, in->false_);
 	}
-	name_cstr = malloc(name->len + 1);
+	name_cstr = tl_alloc_malloc(in, name->len + 1);
+	assert(name_cstr);
 	memcpy(name_cstr, name->str, name->len);
 	name_cstr[name->len] = 0;
-	ret = _boolify(in->modloadf(in->udata, in, name_cstr));
+	ret = _boolify(in->modloadf(in, name_cstr));
 	free(name_cstr);
 	tl_cfunc_return(in, ret);
 }

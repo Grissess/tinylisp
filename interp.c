@@ -3,6 +3,14 @@
 /** An internal macro for creating a new binding inside of a frame. */
 #define _tl_frm_set(sm, obj, fm) tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, sm), obj), fm)
 
+#include <stdio.h>
+#include <stdlib.h>
+static int _readf(tl_interp *in) { return getchar(); }
+static void _writef(tl_interp *in, const char c) { putchar(c); }
+static int _modloadf(tl_interp *in, const char *fn) { return 0; }
+static void *_mallocf(tl_interp *in, size_t n) { return malloc(n); }
+static void _freef(tl_interp *in, void *ptr) { free(ptr); }
+
 /** Initialize a TinyLISP interpreter.
  *
  * This function properly initializes the fields of a `tl_interp`, after which
@@ -18,14 +26,29 @@
  * host environment probably wants to set the `modloadf` function. The ones
  * declared here use the simplest implementation from stdio.h (which may be
  * minilibc's stdio).
+ *
+ * This function calls tl_interp_init_alloc() with the system default
+ * allocator, as provided through malloc and free.
  */
 
-#include <stdio.h>
-static int _readf(void *_, tl_interp *in) { return getchar(); }
-static void _writef(void *_, tl_interp *in, const char c) { putchar(c); }
-static int _modloadf(void *_, tl_interp *in, const char *fn) { return 0; }
-
 void tl_interp_init(tl_interp *in) {
+	tl_interp_init_alloc(in, _mallocf, _freef);
+}
+
+/** Initialize a TinyLISP interpreter with a custom allocator.
+ *
+ * This function is the core of tl_interp_init() and does all of the tasks it
+ * does, but receives two function pointers as arguments corresponding to
+ * tl_interp::mallocf and tl_interp::freef which can be used to adjust the
+ * allocator used for the initializing allocations done by the interpreter (and
+ * thereafter).
+ * 
+ * See tl_interp_init() for other details.
+ */
+
+void tl_interp_init_alloc(tl_interp *in, void *(*mallocf)(tl_interp *, size_t), void (*freef)(tl_interp *, void *)) {
+	in->mallocf = mallocf;
+	in->freef = freef;
 	in->top_alloc = NULL;
 	in->true_ = tl_new_sym(in, "tl-#t");
 	in->false_ = tl_new_sym(in, "tl-#f");

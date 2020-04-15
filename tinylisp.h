@@ -427,13 +427,13 @@ struct tl_interp_s {
 	int putback;
 	/** Whether or not `tl_getc` will return the last "putback". */
 	int is_putback;
-	/** An opaque "user data" pointer used for interface functions.
+	/** An opaque "user data" pointer for use with interface functions.
 	 *
 	 * This value is stored but never modified by TinyLISP; it is not even
 	 * initialized by `tl_interp_init`, but this is usually safe since core
 	 * TinyLISP never accesses the referent of this pointer.
 	 *
-	 * It is passed as the first argument to the interface functions, when
+	 * It is intended to be accessed from the interface functions, when
 	 * TinyLISP needs to "upcall" back into the environment using function
 	 * pointers stored in the interpreter.
 	 */
@@ -444,26 +444,66 @@ struct tl_interp_s {
 	 * the stream is closed, it is valid to return `EOF` (defined in this or
 	 * stdio).
 	 *
-	 * The arguments are the `udata` field and the current interpreter.
+	 * The argument is the current interpreter.
 	 *
 	 * An entirely valid implementation relying on stdio can simply `return
 	 * getchar()`. The default implementation set by `tl_interp_init` does
 	 * this.
 	 */
-	int (*readf)(void *, struct tl_interp_s *);
+	int (*readf)(struct tl_interp_s *);
 	/** Function to write a character.
 	 *
 	 * This function is called to output a byte of output from TinyLISP to
 	 * present to the user.
 	 *
-	 * The arguments are the `udata` field, the current interpreter, and the
-	 * character that is to be output.
+	 * The arguments are the current interpreter and the character that is to
+	 * be output.
 	 *
 	 * An entirely valid implementation relying on stdio can simply
-	 * `putchar(c)` where `c` is the third argument. The default implementation
-	 * set by `tl_interp_init` does this.
+	 * `putchar(c)` where `c` is the second argument. The default
+	 * implementation set by tl_interp_init() does this.
 	 */
-	void (*writef)(void *, struct tl_interp_s *, char);
+	void (*writef)(struct tl_interp_s *, char);
+	/** Function to allocate memory.
+	 *
+	 * This function is called to dynamically allocate a contiguous region of
+	 * memory of the given size.
+	 *
+	 * The arguments are the current interpreter and the size of memory to be
+	 * allocated in bytes.
+	 *
+	 * The return value should be a pointer to such a region, or NULL if the
+	 * request could not be satisfied. TinyLISP will consider it an error if
+	 * the region size was greater than zero and NULL is returned. It is legal
+	 * to return NULL for a request of size 0.
+	 *
+	 * An entirely valid implementation can call `malloc(n)` where `n` is the
+	 * second argument. The default implementation in tl_interp_init() does
+	 * this. Use tl_interp_init_alloc() to change the allocator before
+	 * initialization.
+	 */
+	void *(*mallocf)(struct tl_interp_s *, size_t);
+	/** Function to free memory.
+	 *
+	 * This function is called to free a memory allocation previously granted
+	 * by the \ref mallocf function.
+	 *
+	 * The arguments are the current interpreter and a pointer to a previously
+	 * allocated region of memory.
+	 *
+	 * This function does not return and should not fail. TinyLISP can
+	 * guarantee that it is only called with pointers returned by \ref mallocf
+	 * only when tl_interp_init_alloc() is used to initialize the interpreter;
+	 * changing this function after initializing the interpreter requires
+	 * special care and attention given to outstanding allocations, of which
+	 * many exist as soon as the tl_interp_init() returns.
+	 *
+	 * An entirely valid implementation can call `free(ptr)` where `ptr` is the
+	 * second argument. The default implementation in tl_interp_init() does
+	 * this. Use tl_interp_init_alloc() to change the allocator before
+	 * initialization.
+	 */
+	void (*freef)(struct tl_interp_s *, void *);
 #ifdef CONFIG_MODULES
 	/** Function to load a module.
 	 *
@@ -471,10 +511,9 @@ struct tl_interp_s {
 	 * Naturally, platforms can differ greatly on how this is done, so TinyLISP
 	 * leaves most of the details to this function.
 	 *
-	 * The arguments are the `udata` field, the current interpreter, and the
-	 * symbol passed to `tl-modload` converted to a NUL-terminated C string.
-	 * The return value is usually nonzero if it succeeded, or zero if it
-	 * failed.
+	 * The arguments are the current interpreter and the symbol passed to
+	 * `tl-modload` converted to a NUL-terminated C string. The return value is
+	 * usually nonzero if it succeeded, or zero if it failed.
 	 *
 	 * Generally, the modules built in this source tree export a symbol
 	 * `tl_init` which is supposed to be called after loading the module into
@@ -487,14 +526,15 @@ struct tl_interp_s {
 	 *
 	 * A valid implementation for a platform which does not support module
 	 * loading may simply always `return 0`. The default implementation set by
-	 * `tl_interp_init` does this. See the reference REPL in `main.c` for a
+	 * tl_interp_init() does this. See the reference REPL in `main.c` for a
 	 * UNIX one that uses `dlfcn.h`.
 	 */
-	int (*modloadf)(void *, struct tl_interp_s *, const char *);
+	int (*modloadf)(struct tl_interp_s *, const char *);
 #endif
 };
 
 TL_EXTERN void tl_interp_init(tl_interp *);
+TL_EXTERN void tl_interp_init_alloc(tl_interp *, void *(*)(tl_interp *, size_t), void (*)(tl_interp *, void *));
 TL_EXTERN void tl_interp_cleanup(tl_interp *);
 
 /** Set the error state of the interpreter.
@@ -515,13 +555,13 @@ TL_EXTERN void tl_interp_cleanup(tl_interp *);
 
 /** Gets a character from the interpreter's input stream.
  *
- * This is most often called via `tl_read`; however, programs can also access
+ * This is most often called via tl_read(); however, programs can also access
  * this function via `tl-readc`.
  *
- * This only reads from the backing store (`readf`) if a "putback" isn't set;
- * if one is set, that putback is returned instead.
+ * This only reads from the backing store (tl_interp::readf) if a "putback"
+ * isn't set; if one is set, that putback is returned instead.
  */
-#define tl_getc(in) ((in)->is_putback ? ((in)->is_putback = 0, (in)->putback) : (in)->readf((in)->udata, (in)))
+#define tl_getc(in) ((in)->is_putback ? ((in)->is_putback = 0, (in)->putback) : (in)->readf((in)))
 /** Put back a character to be read again with `tl_getc`, like `ungetc` in stdio.
  *
  * TinyLISP only stores one putback character at a time.
@@ -529,11 +569,27 @@ TL_EXTERN void tl_interp_cleanup(tl_interp *);
 #define tl_putback(in, c) ((in)->is_putback = 1, (in)->putback = (c))
 /** Put a character on the output stream.
  *
- * This usually just invokes `writef` on the interpreter. The usual C functions
- * are `tl_puts`, `tl_print`, `tl_write`, and `tl_printf`, sometimes also
- * called via TinyLISP programs (e.g., `tl-display`).
+ * This usually just invokes tl_interp::writef on the interpreter. The usual C
+ * functions are tl_puts(), tl_print(), tl_write(), and tl_printf(), sometimes
+ * also called via TinyLISP programs (e.g., `tl-display`).
  */
-#define tl_putc(in, c) ((in)->writef((in)->udata, (in), (c)))
+#define tl_putc(in, c) ((in)->writef((in), (c)))
+
+/** Invoke the interpreter's malloc function.
+ *
+ * See tl_interp::mallocf for details. This is called most often via tl_new(),
+ * but also called by other routines which must prepare strings (such as \ref
+ * TL_SYM via tl_new_sym() and tl_read()).
+ */
+#define tl_alloc_malloc(in, n) ((in)->mallocf((in), (n)))
+/** Invoke the interpreter's free function.
+ *
+ * See tl_interp::freef for details.
+ */
+#define tl_alloc_free(in, ptr) ((in)->freef((in), (ptr)))
+
+char *tl_strdup(tl_interp *, const char *);
+void *tl_calloc(tl_interp *, size_t n, size_t s);
 
 TL_EXTERN tl_object *tl_env_get_kv(tl_interp *, tl_object *, tl_object *);
 TL_EXTERN tl_object *tl_env_set_global(tl_interp *, tl_object *, tl_object *, tl_object *);

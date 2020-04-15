@@ -74,8 +74,8 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 
 			case '"':
 				q = c;
-				symbuf = calloc(MAX_SYM_LEN + 1, sizeof(char));
-				while(idx < MAX_SYM_LEN && (d = in->readf(in->udata, in)) != q) {
+				symbuf = tl_calloc(in, MAX_SYM_LEN + 1, sizeof(char));
+				while(idx < MAX_SYM_LEN && (d = in->readf(in)) != q) {
 					symbuf[idx++] = d;
 				}
 				return_sym_from_cstr(in, symbuf);
@@ -99,7 +99,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 						return tl_new_pair(in, val, tl_new_pair(in, list, TL_EMPTY_LIST));
 					}
 				}
-				symbuf = calloc(MAX_SYM_LEN + 1, sizeof(char));
+				symbuf = tl_calloc(in, MAX_SYM_LEN + 1, sizeof(char));
 				symbuf[idx++] = c;
 				while(idx < MAX_SYM_LEN) {
 					switch(d = tl_getc(in)) {

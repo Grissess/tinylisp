@@ -7,7 +7,7 @@ tl_interp *_global_in;
 
 #ifdef CONFIG_MODULES
 #include <dlfcn.h>
-int my_modloadf(void *_, tl_interp *in, const char *fname) {
+int my_modloadf(tl_interp *in, const char *fname) {
 	void *hdl = dlopen(fname, RTLD_NOW | RTLD_GLOBAL);
 	if(!hdl) {
 		tl_printf(in, "Module load error: %s\n", dlerror());

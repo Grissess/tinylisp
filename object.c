@@ -13,10 +13,10 @@
  * collected if it is not reachable from any root on the next call to `tl_gc`.
  */
 tl_object *tl_new(tl_interp *in) {
-	tl_object *obj = malloc(sizeof(tl_object));
+	tl_object *obj = tl_alloc_malloc(in, sizeof(tl_object));
 	if(!obj) {
 		tl_gc(in);
-		obj = malloc(sizeof(tl_object));
+		obj = tl_alloc_malloc(in, sizeof(tl_object));
 		assert(obj);
 	}
 	obj->next_alloc = in->top_alloc;
@@ -62,7 +62,7 @@ tl_object *tl_new_sym_data(tl_interp *in, const char *data, size_t len) {
 	tl_object *obj = tl_new(in);
 	char *copy = NULL;
 	if(len > 0) {
-		copy = malloc(len);
+		copy = tl_alloc_malloc(in, len);
 		memcpy(copy, data, len);
 	}
 	obj->kind = TL_SYM;
@@ -94,7 +94,7 @@ tl_object *tl_new_then(tl_interp *in, void (*cfunc)(tl_interp *, tl_object *, tl
 	obj->kind = TL_THEN;
 	obj->cfunc = cfunc;
 	obj->state = state;
-	obj->name = name ? strdup(name) : NULL;
+	obj->name = name ? tl_strdup(in, name) : NULL;
 	return obj;
 }
 
@@ -177,19 +177,19 @@ void tl_free(tl_interp *in, tl_object *obj) {
 	}
 	switch(obj->kind) {
 		case TL_SYM:
-			free(obj->str);
+			tl_alloc_free(in, obj->str);
 			break;
 
 		case TL_CFUNC:
 		case TL_CFUNC_BYVAL:
 		case TL_THEN:
-			free(obj->name);
+			tl_alloc_free(in, obj->name);
 			break;
 
 		default:
 			break;
 	}
-	free(obj);
+	tl_alloc_free(in, obj);
 }
 
 /** Mark an object and its descendents.
@@ -316,4 +316,40 @@ unsigned long tl_data_hash(const char *data, size_t len) {
 	}
 
 	return ret;
+}
+
+/** Copies a C string into another C string.
+ *
+ * This is an analogue to `strdup` which uses the interpreter allocator
+ * (tl_interp::mallocf).
+ */
+char *tl_strdup(tl_interp *in, const char *str) {
+	size_t s;
+	char *buf;
+
+	if(!str) return NULL;
+
+	s = strlen(str) + 1;
+	if(!s) return NULL;
+
+	buf = tl_alloc_malloc(in, s);
+	if(!buf) {
+		tl_gc(in);
+		buf = tl_alloc_malloc(in, s);
+		assert(buf);
+	}
+
+	return strcpy(buf, str);
+}
+
+/** Allocates an array of size `n` with elements of size `s`, initializing all bytes to 0.
+ *
+ * This is an analogue to `calloc` which uses the interpreter allocator
+ * (tl_interp::mallocf).
+ */
+void *tl_calloc(tl_interp *in, size_t n, size_t s) {
+	// FIXME: Don't multiply the two size_t's unchecked--if this overflows, bad things happen.
+	void *region = tl_alloc_malloc(in, n * s);
+	if(!region) return NULL;
+	return memset(region, 0, n * s);
 }

@@ -188,12 +188,3 @@ void free(void *area) {
 	mem_sanity();
 #endif
 }
-
-/* Yes, I know; don't do this in practice. The multiplication can overflow. */
-void *calloc(size_t n, size_t s) {
-	char *a = malloc(n * s);
-	if(!a) return a;
-	memset(a, 0, n * s);
-	return a;
-}
-
