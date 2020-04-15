@@ -23,9 +23,11 @@
 
 (define nand tl-nand)
 
-(define cons tl-cons)
+; TODO: replace these with clever usages of formal specifiers
 (define car tl-car)
 (define cdr tl-cdr)
+(define cons tl-cons)
+
 (define type tl-type)
 (define null? tl-null?)
 
@@ -39,8 +41,7 @@
 
 (tl-prefix "'" quote)
 (define quote
-  (macro (rest) environ
-		 (car rest)))
+  (macro (lit) environ lit))
 
 ; Continuation compatibility
 (define tl-eval-in
@@ -155,14 +156,14 @@
 		(cons (car l) (tl-quasiquote (cdr l) env))))))
 
 (define quasiquote
-  (macro (rest) environ
-		 (tl-quasiquote (car rest) environ)))
+  (macro (ex) environ
+		 (tl-quasiquote ex environ)))
 
 ; Silly aliases
 
 (define eval
   (macro (expr) environ
-		 (tl-eval-in& environ (car expr) (lambda (ex) (tl-eval-in environ ex)))))
+		 (tl-eval-in& environ expr (lambda (ex) (tl-eval-in environ ex)))))
 
 (define caar
   (lambda (l)
@@ -279,14 +280,13 @@
 ; Language essentials
 
 (define list
-  (macro (rest) environ
-		 (foldl cons '() (map (lambda (x) (tl-eval-in environ x)) rest))))
+  (lambda l l))
 
 (define begin
-  (macro (rest) environ
-		 (tl-eval-in environ `((lambda () @rest)))))
+  (macro body environ
+		 (tl-eval-in environ `((lambda () @body)))))
 (define cond
-  (macro (clauses) environ
+  (macro clauses environ
 		 (if (tl-eval-in environ (caar clauses))
 		   (tl-eval-in environ (cons 'begin (cdar clauses)))
 		   (tl-eval-in environ (cons 'cond (cdr clauses))))))
@@ -294,11 +294,11 @@
 (define else #t)
 
 (define let
-  (macro (bindings body) environ
+  (macro (bindings . body) environ
 		 (tl-eval-in environ `((lambda ,(map car bindings) @body) @(map cadr bindings)))))
 
 (define let*
-  (macro (bindings body) environ
+  (macro (bindings . body) environ
 		 (tl-eval-in environ (if (null? bindings)
 							   `(begin @body)
 							   `(let (,(car bindings)) (let* ,(cdr bindings) @body))))))

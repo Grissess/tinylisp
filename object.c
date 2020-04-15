@@ -273,12 +273,8 @@ void tl_gc(tl_interp *in) {
  */
 size_t tl_list_len(tl_object *l) {
 	size_t cnt = 0;
-	if(!l || !tl_is_pair(l)) {
-		return cnt;
-	}
-	for(tl_list_iter(l, item)) {
-		cnt++;
-	}
+	if(!l || !tl_is_pair(l)) return cnt;
+	for(tl_list_iter(l, item)) cnt++;
 	return cnt;
 }
 
@@ -290,9 +286,15 @@ size_t tl_list_len(tl_object *l) {
  */
 tl_object *tl_list_rvs(tl_interp *in, tl_object *l) {
 	tl_object *res = TL_EMPTY_LIST;
-	for(tl_list_iter(l, item)) {
-		res = tl_new_pair(in, item, res);
-	}
+	for(tl_list_iter(l, item)) res = tl_new_pair(in, item, res);
+	return res;
+}
+
+/** Reverses a list, retaining the last item as its "improper" tail. */
+tl_object *tl_list_rvs_improp(tl_interp *in, tl_object *l) {
+	tl_object *res = tl_first(l);
+	l = tl_next(l);
+	for(tl_list_iter(l, item)) res = tl_new_pair(in, item, res);
 	return res;
 }
 

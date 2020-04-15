@@ -250,6 +250,7 @@ TL_EXTERN void tl_gc(tl_interp *);
 #define tl_list_iter(obj, it) tl_object *l_##it = obj, *it = tl_first(obj); l_##it; l_##it = tl_next(l_##it), it = tl_first(l_##it)
 TL_EXTERN size_t tl_list_len(tl_object *);
 TL_EXTERN tl_object *tl_list_rvs(tl_interp *, tl_object *);
+TL_EXTERN tl_object *tl_list_rvs_improp(tl_interp *, tl_object *);
 
 /** A tuning threshold for hashing.
  *

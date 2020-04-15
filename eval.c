@@ -49,22 +49,56 @@ void tl_push_apply(tl_interp *in, long len, tl_object *expr, tl_object *env) {
 void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, tl_object *cont) {
 	tl_object *callex = tl_first(tl_next(cont));
 	tl_object *env = tl_next(tl_next(cont));
+	tl_object *frm = TL_EMPTY_LIST;
+
+	/* Handle builtins */
 	if(tl_is_cfunc(callex) || tl_is_cfunc_byval(callex) || tl_is_then(callex)) {
 		callex->cfunc(in, args, callex->state);
 		return;
 	}
-	long paramlen = tl_list_len(callex->args);
-	if(tl_is_macro(callex) ? (tl_list_len(args) < paramlen) : (tl_list_len(args) != paramlen)) {
-		tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "bad arity"), tl_new_int(in, paramlen)), args));
+
+	/* Determine if arguments are legal and bind them */
+	if(tl_is_pair(callex->args)) {
+		char is_improp = 0;
+		long paramlen = 0;
+
+		for(tl_list_iter(callex->args, item)) {
+			paramlen++;
+			if(tl_is_sym(tl_next(l_item))) {
+				is_improp = 1;
+				break;
+			}
+		}
+
+		if(is_improp ? (tl_list_len(args) < paramlen) : (tl_list_len(args) != paramlen)) {
+			tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "bad arity"), tl_new_int(in, paramlen)), args));
+			tl_cfunc_return(in, in->false_);
+		}
+
+		/* Bind parameters into a new env, name by name */
+		for(tl_object *acur = callex->args; acur && args; acur = tl_next(acur)) {
+			frm = tl_new_pair(in, tl_new_pair(in, tl_first(acur), tl_first(args)), frm);
+			args = tl_next(args);
+			if(!tl_is_pair(tl_next(acur))) {
+				frm = tl_new_pair(in, tl_new_pair(in, tl_next(acur), args), frm);
+				break;
+			}
+		}
+	} else if(tl_is_sym(callex->args)) {
+		/* Just capture all arguments into the one name in the new frame */
+		frm = tl_new_pair(in, tl_new_pair(in, callex->args, args), frm);
+	} else {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "bad arg kind"), callex->args));
 		tl_cfunc_return(in, in->false_);
 	}
-	tl_object *frm = TL_EMPTY_LIST;
-	for(tl_object *acur = callex->args; acur && args; acur = tl_next(acur)) {
-		frm = tl_new_pair(in, tl_new_pair(in, tl_first(acur), (tl_is_func(callex) || tl_next(acur)) ? tl_first(args) : args), frm);
-		args = tl_next(args);
-	}
+
+	/* For macros: before losing the old one, bind the env */
 	if(callex->envn) frm = tl_new_pair(in, tl_new_pair(in, callex->envn, env), frm);
+
+	/* ...and add the frame into the env, creating a new env */
 	env = tl_new_pair(in, frm, callex->env);
+
+	/* Push the body (in reverse order) onto the cont stack */
 	tl_object *body_rvs = tl_list_rvs(in, callex->body);
 	for(tl_list_iter(body_rvs, ex)) {
 		tl_push_apply(in, ex == tl_first(body_rvs) ? TL_APPLY_PUSH_EVAL : TL_APPLY_DROP_EVAL, ex, env);

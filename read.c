@@ -64,6 +64,23 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 							return tl_list_rvs(in, list);
 							break;
 
+						case '.':
+							list = tl_new_pair(in, tl_read(in, TL_EMPTY_LIST), list);
+							while(d = tl_getc(in)) {
+								if(d != ' ' && d != '\n' && d != '\t' && d != '\v' && d != '\r' && d != 'b') break;
+							}
+
+							/* This definitely SHOULD be the case; the other path is errant. */
+							if(d == ')') {
+								return tl_list_rvs_improp(in, list);
+							} else {
+								tl_putback(in, d);
+								list = tl_new_pair(in, tl_first(list), tl_new_pair(in, tl_new_sym(in, "."), tl_next(list)));
+							}
+
+							break;
+
+
 						default:
 							tl_putback(in, d);
 							list = tl_new_pair(in, tl_read(in, TL_EMPTY_LIST), list);
