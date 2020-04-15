@@ -5,14 +5,6 @@
 
 tl_interp *_global_in;
 
-int my_readf(void *_, tl_interp *in) {
-	return getchar();
-}
-
-void my_writef(void *_, tl_interp *in, const char c) {
-	putchar(c);
-}
-
 #ifdef CONFIG_MODULES
 #include <dlfcn.h>
 int my_modloadf(void *_, tl_interp *in, const char *fname) {
@@ -56,8 +48,6 @@ int main() {
 	_global_in = &in;
 
 	tl_interp_init(&in);
-	in.readf = my_readf;
-	in.writef = my_writef;
 #ifdef CONFIG_MODULES
 	in.modloadf = my_modloadf;
 #endif

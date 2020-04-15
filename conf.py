@@ -68,7 +68,7 @@ release = '0.1'
 
 # Breathe's own information about the project.
 breathe_projects = {
-    project: 'doc/xml',
+    project: 'doxyxml/xml',
 }
 breathe_default_project = project
 breathe_projects_souce = {

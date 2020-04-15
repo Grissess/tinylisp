@@ -18,6 +18,8 @@
 #endif
 
 #if defined(MODULE) && !defined(MODULE_BUILTIN)
+#define TL_EXTERN extern
+#else
 /** `extern` keyword used throughout the header
  *
  * This is set to `extern` whenever the current source (.c) file is being
@@ -25,8 +27,6 @@
  * in this library are external (because they are in the interpreter which
  * loads them). It is defined as an empty string otherwise.
  */
-#define TL_EXTERN extern
-#else
 #define TL_EXTERN
 #endif
 
@@ -37,15 +37,15 @@ typedef struct tl_interp_s tl_interp;
  * This structure describes every TinyLisp object at runtime, and contains the
  * pertinent members to each type.
  *
- * Note that `NULL` is a valid object--it is `TL_EMPTY_LIST`, the empty pair
+ * Note that `NULL` is a valid object&mdash;it is `TL_EMPTY_LIST`, the empty pair
  * `()`.
  */
 typedef struct tl_object_s {
 	/** The type of this object. Instead of testing this directly, you should prefer the `tl_is_*` macros instead. */
 	enum {
-		/** Integer objects (C long). */
+		/** \anchor TL_INT Integer objects (C long). */
 		TL_INT,
-		/** Symbol objects (loosely, strings, but not C strings). */
+		/** \anchor TL_SYM Symbol objects (loosely, strings, but not C strings). */
 		TL_SYM,
 		/** A `cons` pair. */
 		TL_PAIR,
@@ -63,60 +63,60 @@ typedef struct tl_object_s {
 		TL_CONT,
 	} kind;
 	union {
-		/** For `TL_INT`, the signed long integer value. Note that TL does not internally support unlimited precision. */
+		/** For \ref TL_INT, the signed long integer value. Note that TL does not internally support unlimited precision. */
 		long ival;
 		struct {
-			/** For `TL_SYM`, a pointer to a byte array containing the symbol name. The pointed-to memory should be treated as read-only&mdash;if you need a new symbol, make another. */
+			/** For \ref TL_SYM, a pointer to a byte array containing the symbol name. The pointed-to memory should be treated as read-only&mdash;if you need a new symbol, make another. */
 			char *str;
-			/** For `TL_SYM`, the length of the pointed-to byte array. */
+			/** For \ref TL_SYM, the length of the pointed-to byte array. */
 			size_t len;
-			/** For `TL_SYM`, a hash of the symbol, used to speed up comparison. */
+			/** For \ref TL_SYM, a hash of the symbol, used to speed up comparison. */
 			unsigned long hash;
 		};
 		struct {
-			/** For (non-NULL) `TL_PAIR`, a pointer to the first of the pair (CAR in traditional LISP). */
+			/** For (non-NULL) \ref TL_PAIR, a pointer to the first of the pair (CAR in traditional LISP). */
 			struct tl_object_s *first;
-			/** For (non-NULL) `TL_PAIR`, a pointer to the next of the pair (CDR in traditional LISP). */
+			/** For (non-NULL) \ref TL_PAIR, a pointer to the next of the pair (CDR in traditional LISP). */
 			struct tl_object_s *next;
 		};
 		struct {
-			/** For `TL_THEN` and `TL_CFUNC`, a pointer to the actual C function. */
+			/** For \ref TL_THEN and \ref TL_CFUNC, a pointer to the actual C function. */
 			void (*cfunc)(tl_interp *, struct tl_object_s *, struct tl_object_s *);
-			/** For `TL_THEN`, the state argument (parameter 3). */
+			/** For \ref TL_THEN, the state argument (parameter 3). */
 			struct tl_object_s *state;
-			/** For `TL_THEN` and `TL_CFUNC`, a C string containing the name of the function, or `NULL`. */
+			/** For \ref TL_THEN and \ref TL_CFUNC, a C string containing the name of the function, or NULL. */
 			char *name;
 		};
 		struct {
-			/** For `TL_MACRO` and `TL_FUNC`, the formal arguments (a linear list of symbols). */
+			/** For \ref TL_MACRO and \ref TL_FUNC, the formal arguments (a linear list of symbols). */
 			struct tl_object_s *args;
-			/** For `TL_MACRO` and `TL_FUNC`, the body of the function (a linear list of expressions, usually other lists, for which the last provides the valuation). */
+			/** For \ref TL_MACRO and \ref TL_FUNC, the body of the function (a linear list of expressions, usually other lists, for which the last provides the valuation). */
 			struct tl_object_s *body;
-			/** For `TL_MACRO` and `TL_FUNC`, the environment captured by the function or macro when it was defined. */
+			/** For TL_MACRO and TL_FUNC, the environment captured by the function or macro when it was defined. */
 			struct tl_object_s *env;
-			/** For `TL_MACRO`, the TL symbol object containing the name of the argument which will be bound to the evaluation environment, or `NULL`. */
+			/** For TL_MACRO, the TL symbol object containing the name of the argument which will be bound to the evaluation environment, or NULL. */
 			struct tl_object_s *envn;
 		};
 		struct {
-			/** For `TL_CONT`, the evaluation environment to which to return. */
+			/** For \ref TL_CONT, the evaluation environment to which to return. */
 			struct tl_object_s *ret_env;
-			/** For `TL_CONT`, the return continuation stack to which to return. */
+			/** For \ref TL_CONT, the return continuation stack to which to return. */
 			struct tl_object_s *ret_conts;
-			/** For `TL_CONT`, the value stack to which to return. */
+			/** For \ref TL_CONT, the value stack to which to return. */
 			struct tl_object_s *ret_values;
 		};
 	};
 	union {
 		/** For the garbage collector, a pointer to the next allocated object. */
 		struct tl_object_s *next_alloc;
-		/** As `next_alloc` but cast to an integer of platform size. Used by the GC for bitpacking. */
+		/** As \ref next_alloc but cast to an integer of platform size. Used by the GC for bitpacking. */
 		size_t next_alloc_i;
 	};
 	/** For the garbage collector, a pointer to the previous allocated object. */
 	struct tl_object_s *prev_alloc;
 } tl_object;
 
-/** For the garbage collector, the bitmask for bitpacking into :ref:`next_alloc_i`. 
+/** For the garbage collector, the bitmask for bitpacking into tl_object::next_alloc_i .
  *
  * This claims 2 bits of the bottom of the address, which means all objects
  * must be 4-byte aligned. This is the norm on most 32-bit and 64-bit
@@ -124,7 +124,7 @@ typedef struct tl_object_s {
  * for esoteric platofms.
  */
 #define TL_FMASK 0x3
-/** Mark bit for bitpacking int :ref:`next_alloc_i`.
+/** Mark bit for bitpacking int tl_object::next_alloc_i .
  *
  * The garbage collector uses this to mark objects during the mark pass of its
  * mark/sweep operation.
@@ -133,7 +133,7 @@ typedef struct tl_object_s {
 
 /** Mark an object.
  *
- * This sets a bit in the :ref:`next_alloc_i` field of *this* object.
+ * This sets a bit in the tl_object::next_alloc_i field of *this* object.
  *
  * Only the garbage collector should do this. It clears all marks before doing
  * a mark pass, anyway.
@@ -141,14 +141,14 @@ typedef struct tl_object_s {
 #define tl_mark(obj) ((obj)->next_alloc_i |= TL_F_MARK)
 /** Unmark an object.
  *
- * This clears a bit in the :ref:`next_alloc_i` field of *this* object.
+ * This clears a bit in the tl_object::next_alloc_i field of *this* object.
  *
  * Only the garbage collector should use this.
  */
 #define tl_unmark(obj) ((obj)->next_alloc_i &= ~TL_FMASK)
 /** Check if an object is marked.
  *
- * This checks a bit in the :ref:`next_alloc_i` field of *this* object.
+ * This checks a bit in the tl_object::next_alloc_i field of *this* object.
  *
  * This is generally only valid after a mark pass of the garbage collector.
  */
@@ -156,19 +156,18 @@ typedef struct tl_object_s {
 /** Safely dereference the next allocated object.
  *
  * This is necessary because the low bits may have packed flags via
- * :ref:`next_alloc_i`.
+ * tl_object::next_alloc_i .
  */
 #define tl_next_alloc(obj) ((tl_object *)((obj)->next_alloc_i & (~TL_FMASK)))
-/** Create a new `next_alloc` pointer to store in an object.
+/** Create a new tl_object::next_alloc pointer to store in an object.
  *
- * The value of this macro is suitable to store in :ref:`next_alloc`.
- *
- * Pass `orig` as the current value of :ref:`next_alloc`, and `ptr` as the pointer
- * to the new object to store as the "next allocation". This macro preserves
- * flags packed into :ref:`next_alloc_i` onto this object.
+ * The value of this macro is suitable to store in tl_object::next_alloc* Pass
+ * `orig` as the current value of tl_object::next_alloc , and `ptr` as the
+ * pointer to the new object to store as the "next allocation". This macro
+ * preserves flags packed into tl_object::next_alloc_i onto this object.
  *
  * Generally, only the allocator needs to do this. Don't forget to keep the
- * doubly-linked-list valid by updating :ref:`prev_alloc` as well.
+ * doubly-linked-list valid by updating tl_object::prev_alloc as well.
  */
 #define tl_make_next_alloc(orig, ptr) ((tl_object *)(((obj)->next_alloc_i & (~TL_FMASK)) | (((size_t)(orig)) & TL_FMASK)))
 
@@ -191,9 +190,9 @@ TL_EXTERN tl_object *tl_new_cont(tl_interp *, tl_object *, tl_object *, tl_objec
 TL_EXTERN void tl_free(tl_interp *, tl_object *);
 TL_EXTERN void tl_gc(tl_interp *);
 
-/** Test whether an object is a TL_INT. */
+/** Test whether an object is a \ref TL_INT. */
 #define tl_is_int(obj) ((obj) && (obj)->kind == TL_INT)
-/** Test whether an object is a TL_SYM. */
+/** Test whether an object is a \ref TL_SYM. */
 #define tl_is_sym(obj) ((obj) && (obj)->kind == TL_SYM)
 /* FIXME: NULL is a valid empty list */
 /** Test whether an object is a pair. Note that NULL and TL_EMPTY_LIST are
@@ -448,7 +447,8 @@ struct tl_interp_s {
 	 * The arguments are the `udata` field and the current interpreter.
 	 *
 	 * An entirely valid implementation relying on stdio can simply `return
-	 * getchar()`.
+	 * getchar()`. The default implementation set by `tl_interp_init` does
+	 * this.
 	 */
 	int (*readf)(void *, struct tl_interp_s *);
 	/** Function to write a character.
@@ -460,7 +460,8 @@ struct tl_interp_s {
 	 * character that is to be output.
 	 *
 	 * An entirely valid implementation relying on stdio can simply
-	 * `putchar(c)` where `c` is the third argument.
+	 * `putchar(c)` where `c` is the third argument. The default implementation
+	 * set by `tl_interp_init` does this.
 	 */
 	void (*writef)(void *, struct tl_interp_s *, char);
 #ifdef CONFIG_MODULES
@@ -485,7 +486,9 @@ struct tl_interp_s {
 	 * fatal errors (setting `tl_has_error`), but simply return 0.
 	 *
 	 * A valid implementation for a platform which does not support module
-	 * loading may simply always `return 0`.
+	 * loading may simply always `return 0`. The default implementation set by
+	 * `tl_interp_init` does this. See the reference REPL in `main.c` for a
+	 * UNIX one that uses `dlfcn.h`.
 	 */
 	int (*modloadf)(void *, struct tl_interp_s *, const char *);
 #endif
@@ -627,7 +630,9 @@ TL_EXTERN int tl_push_eval(tl_interp *, tl_object *, tl_object *);
  * continuation stack to indicate that the value pushes for the next evaluation
  * (queued by `tl_push_apply` is to be used as a callable for the next
  * application. The current application is said to be "suspended", and will be
- * "resumed" after the callable value is available.
+ * "resumed" after the callable value is available. (Note that the current
+ * application may never resume if this stack is abandoned via resuming another
+ * continuation directly--calling a TL_CONT object.)
  */
 #define TL_APPLY_INDIRECT -2
 /** A special continuation flag for evaluating, but not pushing, an evaluation of an expression.
@@ -639,7 +644,7 @@ TL_EXTERN int tl_push_eval(tl_interp *, tl_object *, tl_object *);
 /** A special continuation flag that simply drops the top of the value stack and continues.
  *
  * This needs to be left when a TL_APPLY_DROP_EVAL evaluation is indirected,
- * which is a rare circumstance.
+ * which is indeed a rare circumstance.
  */
 #define TL_APPLY_DROP -4
 TL_EXTERN void tl_push_apply(tl_interp *, long, tl_object *, tl_object *);

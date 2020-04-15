@@ -12,10 +12,19 @@
  * The source for this function is a logical place to add more language
  * builtins if a module would not suffice.
  *
- * Some initialization MUST follow this; for example, TinyLISP's `tl_interp`
- * needs a valid `readf` and `writef` field before use. See the field
- * documentation for initializing those fields.
+ * Other initialization may need to follow calling this function; for example,
+ * if the implementation wants to override IO, it may set the interpreter's
+ * `readf` and `writef` functions. If they are to be functionally used, the
+ * host environment probably wants to set the `modloadf` function. The ones
+ * declared here use the simplest implementation from stdio.h (which may be
+ * minilibc's stdio).
  */
+
+#include <stdio.h>
+static int _readf(void *_, tl_interp *in) { return getchar(); }
+static void _writef(void *_, tl_interp *in, const char c) { putchar(c); }
+static int _modloadf(void *_, tl_interp *in, const char *fn) { return 0; }
+
 void tl_interp_init(tl_interp *in) {
 	in->top_alloc = NULL;
 	in->true_ = tl_new_sym(in, "tl-#t");
@@ -28,6 +37,11 @@ void tl_interp_init(tl_interp *in) {
 	in->ctr_events = 0;
 	in->putback = 0;
 	in->is_putback = 0;
+	in->readf = _readf;
+	in->writef = _writef;
+#ifdef CONFIG_MODULES
+	in->modloadf = _modloadf;
+#endif
 
 	in->top_env = TL_EMPTY_LIST;
 
