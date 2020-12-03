@@ -72,7 +72,8 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			tl_print(in, obj->args);
 			tl_printf(in, " ");
 			if(tl_is_macro(obj)) {
-				tl_printf(in, "%s ", obj->envn);
+				tl_print(in, obj->envn);
+				tl_printf(in, " ");
 			}
 			_print_pairs(in, obj->body);
 			tl_printf(in, ")");
