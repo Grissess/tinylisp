@@ -87,15 +87,15 @@ void tl_dbg_print(tl_object *obj, int level) {
 	}
 }
 
-void _tl_cf_debug_print_k(tl_interp *in, tl_object *result, tl_object *_) {
+static void _tl_cf_debug_print_k(tl_interp *in, tl_object *result, tl_object *_) {
 	fprintf(stderr, "VALUE:\n");
 	tl_dbg_print(tl_first(result), 0);
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cf_debug_print(tl_interp *in, tl_object *obj, tl_object *_) {
+TL_CF(debug_print, "debug-print") {
 	fprintf(stderr, "EXPR:\n");
-	tl_dbg_print(tl_first(obj), 0);
-	tl_eval_and_then(in, tl_first(obj), NULL, _tl_cf_debug_print_k);
+	tl_dbg_print(tl_first(args), 0);
+	tl_eval_and_then(in, tl_first(args), NULL, _tl_cf_debug_print_k);
 }
 #endif

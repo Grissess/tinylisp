@@ -690,6 +690,9 @@ TL_EXTERN int tl_push_eval(tl_interp *, tl_object *, tl_object *);
  * "resumed" after the callable value is available. (Note that the current
  * application may never resume if this stack is abandoned via resuming another
  * continuation directly--calling a TL_CONT object.)
+ *
+ * This indirection trick is also used in the implementation of the apply
+ * builtin.
  */
 #define TL_APPLY_INDIRECT -2
 /** A special continuation flag for evaluating, but not pushing, an evaluation of an expression.
@@ -747,5 +750,19 @@ static int tl_init
 #endif  /* ifdef MODULE_BUILTIN */
 
 #endif  /* ifdef MODULE */
+
+#define TL_EF_BYVAL 0x01
+typedef struct tl_init_ent_s {
+	void (*fn)(tl_interp *, tl_object *, tl_object *);
+	const char *name;
+	size_t flags;
+} __attribute__((aligned(8))) tl_init_ent;
+#define TL_CF_FLAGS(func, nm, f) void tl_cf_##func(tl_interp *, tl_object *, tl_object *);\
+static tl_init_ent __attribute__((section(".tl_init_ents"),aligned(8))) init_tl_cf_##func = {\
+	.fn = tl_cf_##func, .name = "tl-" nm, .flags = (f),\
+};\
+void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
+#define TL_CF(func, nm) TL_CF_FLAGS(func, nm, 0)
+#define TL_CFBV(func, nm) TL_CF_FLAGS(func, nm, TL_EF_BYVAL)
 
 #endif

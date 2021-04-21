@@ -3,6 +3,7 @@ LIB :=
 SRC = $(patsubst %.o,%.c,$(OBJ))
 CFLAGS ?= -g -std=gnu99 -DDEBUG $(DEFINES)
 LDFLAGS ?= 
+LDFLAGS += -Tlink.ld
 DESTDIR ?= /usr/local/
 CC ?= gcc
 

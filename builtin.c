@@ -34,7 +34,7 @@ int _unboolify(tl_interp *in, tl_object *obj) {
 	} \
 } while(0)
 
-void tl_cfbv_error(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(error, "error") {
 	if(args) {
 		tl_error_set(in, tl_first(args));
 		tl_cfunc_return(in, in->true_);
@@ -43,7 +43,7 @@ void tl_cfbv_error(tl_interp *in, tl_object *args, tl_object *_) {
 	}
 }
 
-void tl_cf_macro(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CF(macro, "macro") {
 	tl_object *fargs = tl_first(args);
 	tl_object *envn = tl_first(tl_next(args));
 	tl_object *body = tl_next(tl_next(args));
@@ -54,18 +54,18 @@ void tl_cf_macro(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_macro(in, fargs, envn, body, in->env));
 }
 
-void tl_cf_lambda(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CF(lambda, "lambda") {
 	tl_object *fargs = tl_first(args);
 	tl_object *body = tl_next(args);
 	tl_cfunc_return(in, tl_new_func(in, fargs, body, in->env));
 }
 
-void _tl_cf_define_k(tl_interp *in, tl_object *result, tl_object *key) {
+static void _tl_cf_define_k(tl_interp *in, tl_object *result, tl_object *key) {
 	tl_env_set_local(in, in->env, key, tl_first(result));
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cf_define(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CF(define, "define") {
 	tl_object *key = tl_first(args), *val = tl_first(tl_next(args));
 	arity_n(in, args, 2, "define");
 	if(!tl_is_sym(key)) {
@@ -75,7 +75,7 @@ void tl_cf_define(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_eval_and_then(in, val, key, _tl_cf_define_k);
 }
 
-void tl_cfbv_display(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(display, "display") {
 	for(tl_list_iter(args, arg)) {
 		tl_print(in, arg);
 		if(tl_next(l_arg)) tl_printf(in, "\t");
@@ -84,14 +84,14 @@ void tl_cfbv_display(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cf_prefix(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CF(prefix, "prefix") {
 	tl_object *prefix = tl_first(args);
 	tl_object *name = tl_first(tl_next(args));
 	in->prefixes = tl_new_pair(in, tl_new_pair(in, prefix, name), in->prefixes);
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cfbv_evalin(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(evalin, "eval-in&") {
 	arity_n(in, args, 3, "eval-in&");
 	tl_object *env = tl_first(args);
 	tl_object *expr = tl_first(tl_next(args));
@@ -100,34 +100,34 @@ void tl_cfbv_evalin(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_push_eval(in, expr, env);
 }
 
-void tl_cfbv_call_with_current_continuation(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(call_with_current_continuation, "call-with-current-continuation") {
 	arity_1(in, args, "call-with-current-continuation");
 	tl_object *cont = tl_new_cont(in, in->env, in->conts, in->values);
 	tl_push_apply(in, 1, tl_first(args), in->env);
 	tl_values_push(in, cont);
 }
 
-void tl_cfbv_cons(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(cons, "cons") {
 	arity_n(in, args, 2, "cons");
 	tl_cfunc_return(in, tl_new_pair(in, tl_first(args), tl_first(tl_next(args))));
 }
 
-void tl_cfbv_car(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(car, "car") {
 	arity_1(in, args, "car");
 	tl_cfunc_return(in, tl_first(tl_first(args)));
 }
 
-void tl_cfbv_cdr(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(cdr, "cdr") {
 	arity_1(in, args, "cdr");
 	tl_cfunc_return(in, tl_next(tl_first(args)));
 }
 
-void tl_cfbv_null(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(null, "null?") {
 	arity_1(in, args, "null?");
 	tl_cfunc_return(in,  _boolify(!tl_first(args)));
 }
 
-void _tl_cf_if_k(tl_interp *in, tl_object *result, tl_object *branches) {
+static void _tl_cf_if_k(tl_interp *in, tl_object *result, tl_object *branches) {
 	tl_object *ift = tl_first(branches), *iff = tl_first(tl_next(branches));
 	if(_unboolify(in, tl_first(result))) {
 		tl_push_eval(in, ift, in->env);
@@ -136,26 +136,26 @@ void _tl_cf_if_k(tl_interp *in, tl_object *result, tl_object *branches) {
 	}
 }
 
-void tl_cf_if(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CF(if, "if") {
 	tl_object *cond = tl_first(args);
 	arity_n(in, args, 3, "if");
 	tl_eval_and_then(in, cond, tl_next(args), _tl_cf_if_k);
 }
 
-void _tl_cf_set_k(tl_interp *in, tl_object *result, tl_object *key) {
+static void _tl_cf_set_k(tl_interp *in, tl_object *result, tl_object *key) {
 	tl_env_set_global(in, in->env, key, tl_first(result));
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cf_set(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CF(set, "set!") {
 	tl_object *key = tl_first(args), *val = tl_first(tl_next(args));
 	arity_n(in, args, 2, "set");
 	verify_type(in, key, sym, "set!");
 	tl_eval_and_then(in, val, key, _tl_cf_set_k);
 }
 
-void tl_cfbv_env(tl_interp *in, tl_object *result, tl_object *_) {
-	tl_object *f = tl_first(result);
+TL_CFBV(env, "env") {
+	tl_object *f = tl_first(args);
 	if(!f) {
 		tl_cfunc_return(in, in->env);
 	}
@@ -166,7 +166,7 @@ void tl_cfbv_env(tl_interp *in, tl_object *result, tl_object *_) {
 	tl_cfunc_return(in, f->env);
 }
 
-void tl_cfbv_setenv(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(setenv, "set-env!") {
 	tl_object *first = tl_first(args), *next = tl_first(tl_next(args));
 	if(!next) {
 		in->env = first;
@@ -180,11 +180,11 @@ void tl_cfbv_setenv(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cfbv_topenv(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(topenv, "top-env") {
 	tl_cfunc_return(in, in->top_env);
 }
 
-void tl_cfbv_concat(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(concat, "concat") {
 	char *buffer, *end, *src;
 	size_t sz = 0, rsz;
 	for(tl_list_iter(args, val)) {
@@ -205,20 +205,20 @@ void tl_cfbv_concat(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_sym_data(in, buffer, rsz));
 }
 
-void tl_cfbv_length(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(length, "length") {
 	arity_1(in, args, "length");
 	verify_type(in, tl_first(args), sym, "length");
 	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->len));
 }
 
-void tl_cfbv_ord(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(ord, "ord") {
 	arity_n(in, args, 2, "ord");
 	verify_type(in, tl_first(args), sym, "ord");
 	verify_type(in, tl_first(tl_next(args)), int, "ord");
 	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->str[tl_first(tl_next(args))->ival]));
 }
 
-void tl_cfbv_chr(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(chr, "chr") {
 	char s[2] = {};
 	arity_1(in, args, "chr");
 	verify_type(in, tl_first(args), int, "chr");
@@ -226,25 +226,25 @@ void tl_cfbv_chr(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_sym(in, s));
 }
 
-void tl_cfbv_readc(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(readc, "readc") {
 	tl_cfunc_return(in, tl_new_int(in, tl_getc(in)));
 }
 
-void tl_cfbv_putbackc(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(putbackc, "putbackc") {
 	arity_1(in, args, "putback");
 	verify_type(in, tl_first(args), int, "putback");
 	tl_putback(in, tl_first(args)->ival);
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cfbv_writec(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(writec, "writec") {
 	arity_1(in, args, "write");
 	verify_type(in, tl_first(args), int, "write");
 	tl_putc(in, tl_first(args)->ival);
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cfbv_add(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(add, "+") {
 	long res = 0;
 	for(tl_list_iter(args, val)) {
 		verify_type(in, val, int, "+");
@@ -253,7 +253,7 @@ void tl_cfbv_add(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_int(in, res));
 }
 
-void tl_cfbv_sub(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(sub, "-") {
 	long phase = 0;
 	long res = 0;
 	for(tl_list_iter(args, val)) {
@@ -268,7 +268,7 @@ void tl_cfbv_sub(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_int(in, res));
 }
 
-void tl_cfbv_mul(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(mul, "*") {
 	long res = 1;
 	for(tl_list_iter(args, val)) {
 		verify_type(in, val, int, "*");
@@ -277,7 +277,7 @@ void tl_cfbv_mul(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_int(in, res));
 }
 
-void tl_cfbv_div(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(div, "/") {
 	long phase = 0;
 	long res = 1;
 	for(tl_list_iter(args, val)) {
@@ -292,7 +292,7 @@ void tl_cfbv_div(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_int(in, res));
 }
 
-void tl_cfbv_mod(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(mod, "%") {
 	long phase = 0;
 	long res = 1;
 	for(tl_list_iter(args, val)) {
@@ -307,7 +307,7 @@ void tl_cfbv_mod(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_int(in, res));
 }
 
-void tl_cfbv_eq(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(eq, "=") {
 	tl_object *a = tl_first(args), *b = tl_first(tl_next(args));
 	if(tl_is_int(a) && tl_is_int(b)) {
 		tl_cfunc_return(in, _boolify(a->ival == b->ival));
@@ -318,7 +318,7 @@ void tl_cfbv_eq(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, _boolify(a == b));
 }
 
-void tl_cfbv_less(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(less, "<") {
 	tl_object *a = tl_first(args), *b = tl_first(tl_next(args));
 	if(tl_is_int(a) && tl_is_int(b)) {
 		tl_cfunc_return(in, _boolify(a->ival < b->ival));
@@ -330,12 +330,12 @@ void tl_cfbv_less(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, in->false_);
 }
 
-void tl_cfbv_nand(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(nand, "nand") {
 	int a = _unboolify(in, tl_first(args)), b = _unboolify(in, tl_first(tl_next(args)));
 	tl_cfunc_return(in, _boolify(!(a && b)));
 }
 
-void tl_cfbv_type(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(type, "type") {
 	tl_object *obj = tl_first(args);
 	if(tl_has_error(in)) {
 		tl_cfunc_return(in, in->false_);
@@ -352,27 +352,23 @@ void tl_cfbv_type(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, tl_new_sym(in, "unknown"));
 }
 
-#if 0
-tl_object *tl_cf_apply(tl_interp *in, tl_object *args) {
-	tl_object *list = TL_EMPTY_LIST;
-	for(tl_list_iter(args, item)) {
-		list = tl_new_pair(in, tl_eval(in, item), list);
-	}
-	return tl_apply(in, tl_list_rvs(in, list));
+TL_CFBV(apply, "apply") {
+	arity_1(in, args, "apply");
+	tl_values_push(in, tl_first(args));
+	tl_push_apply(in, TL_APPLY_INDIRECT, tl_new_int(in, tl_list_len(tl_next(args))), in->env);
 }
-#endif
 
-void tl_cfbv_gc(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(gc, "gc") {
 	tl_gc(in);
 	tl_cfunc_return(in, in->true_);
 }
 
-void tl_cfbv_read(tl_interp *in, tl_object *args, tl_object *_) {
+TL_CFBV(read, "read") {
 	tl_cfunc_return(in, tl_read(in, TL_EMPTY_LIST));
 }
 
+TL_CFBV(load_mod, "load-mod") {
 #ifdef CONFIG_MODULES
-void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_object *name = tl_first(args);
 	char *name_cstr;
 	tl_object *ret;
@@ -387,9 +383,7 @@ void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
 	ret = _boolify(in->modloadf(in, name_cstr));
 	free(name_cstr);
 	tl_cfunc_return(in, ret);
-}
 #else
-void tl_cfbv_load_mod(tl_interp *in, tl_object *args, tl_object *_) {
 	tl_cfunc_return(in, in->false_);
-}
 #endif
+}
