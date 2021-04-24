@@ -37,8 +37,8 @@ void _main_k(tl_interp *in, tl_object *result, tl_object *_) {
 }
 
 #ifdef CONFIG_MODULES_BUILTIN
-extern void *_TL_BUILTIN_MODULES_START;
-extern void *_TL_BUILTIN_MODULES_END;
+extern void *__start_tl_bmcons;
+extern void *__stop_tl_bmcons;
 #endif
 
 int main() {
@@ -53,8 +53,8 @@ int main() {
 #endif
 #ifdef CONFIG_MODULES_BUILTIN
 	{
-		int (**fp)(tl_interp *, const char *) = (int (**)(tl_interp *, const char *))&_TL_BUILTIN_MODULES_START;
-		while(fp != (int (**)(tl_interp *, const char *))&_TL_BUILTIN_MODULES_END)
+		int (**fp)(tl_interp *, const char *) = (int (**)(tl_interp *, const char *))&__start_tl_bmcons;
+		while(fp != (int (**)(tl_interp *, const char *))&__stop_tl_bmcons)
 			(*fp++)(&in, NULL);
 	}
 #endif

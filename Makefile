@@ -3,7 +3,6 @@ LIB :=
 SRC = $(patsubst %.o,%.c,$(OBJ))
 CFLAGS ?= -g -std=gnu99 -DDEBUG $(DEFINES)
 LDFLAGS ?= 
-LDFLAGS += -Tlink.ld
 DESTDIR ?= /usr/local/
 CC ?= gcc
 
@@ -35,7 +34,6 @@ endif
 
 ifneq ($(MODULES_BUILTIN),)
 	CFLAGS += -DCONFIG_MODULES_BUILTIN="$(MODULES_BUILTIN)"
-	LDFLAGS += -Tlink_builtin.ld
 	MODULES_BUILTIN_OBJECTS := $(patsubst %,mod/%.o,$(MODULES_BUILTIN))
 $(MODULES_BUILTIN_OBJECTS): CFLAGS += -I. -DMODULE -DMODULE_BUILTIN
 	OBJ += $(MODULES_BUILTIN_OBJECTS)

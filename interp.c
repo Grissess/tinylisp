@@ -1,6 +1,6 @@
 #include "tinylisp.h"
 
-extern tl_init_ent _TL_INIT_ENTS_START, _TL_INIT_ENTS_END;
+extern tl_init_ent __start_tl_init_ents, __stop_tl_init_ents;
 /** An internal macro for creating a new binding inside of a frame. */
 #define _tl_frm_set(sm, obj, fm) tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, sm), obj), fm)
 
@@ -70,11 +70,11 @@ void tl_interp_init_alloc(tl_interp *in, void *(*mallocf)(tl_interp *, size_t), 
 	in->top_env = TL_EMPTY_LIST;
 
 	tl_object *top_frm = TL_EMPTY_LIST;
-	tl_init_ent *current = &_TL_INIT_ENTS_START;
+	tl_init_ent *current = &__start_tl_init_ents;
 	top_frm = _tl_frm_set("tl-#t", in->true_, top_frm);
 	top_frm = _tl_frm_set("tl-#f", in->false_, top_frm);
 
-	while(current != &_TL_INIT_ENTS_END) {
+	while(current != &__stop_tl_init_ents) {
 		top_frm = _tl_frm_set(
 				current->name,
 				current->flags & TL_EF_BYVAL ? tl_new_cfunc_byval(in, current->fn) : tl_new_cfunc(in, current->fn),

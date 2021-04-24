@@ -740,7 +740,7 @@ TL_EXTERN void tl_cf_debug_print(tl_interp *, tl_object *, tl_object *);
 #ifdef MODULE_BUILTIN
 
 #define TL_MOD_INIT static int tl_init(tl_interp *, const char *); \
-static void * __attribute__((section(".tl_bmcons"))) tl_init_fp = tl_init; \
+static void * __attribute__((section("tl_bmcons"))) tl_init_fp = tl_init; \
 static int tl_init
 
 #else
@@ -758,7 +758,7 @@ typedef struct tl_init_ent_s {
 	size_t flags;
 } __attribute__((aligned(8))) tl_init_ent;
 #define TL_CF_FLAGS(func, nm, f) void tl_cf_##func(tl_interp *, tl_object *, tl_object *);\
-static tl_init_ent __attribute__((section(".tl_init_ents"),aligned(8))) init_tl_cf_##func = {\
+static tl_init_ent __attribute__((section("tl_init_ents"),aligned(8),used)) init_tl_cf_##func = {\
 	.fn = tl_cf_##func, .name = "tl-" nm, .flags = (f),\
 };\
 void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
