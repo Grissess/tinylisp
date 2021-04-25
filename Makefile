@@ -70,6 +70,6 @@ tl: $(OBJ)
 	$(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
 
 %.so: %.o
-	$(CC) -shared -o $@ $(CFLAGS) $^ $(LDFLAGS)
+	$(CC) -shared -o $@ $(CFLAGS) $< $(LDFLAGS)
 
 $(OBJ) $(LIB): tinylisp.h
