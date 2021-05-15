@@ -57,3 +57,17 @@ void *memcpy(void *dest, const void *src, size_t n) {
 	}
 	return dest;
 }
+
+void *memmove(void *dest, const void *src, size_t n) {
+	size_t i;
+	if(src == dest) return dest;
+	if(src < dest) {
+		for(i = n - 1; i > 0; i--) {
+			((char *)dest)[i] = ((char *)src)[i];
+		}
+		*((char *)dest) = *((char *)src);
+	} else {
+		memcpy(dest, src, n);
+	}
+	return dest;
+}

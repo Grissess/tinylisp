@@ -22,8 +22,8 @@ void tl_dbg_print(tl_object *obj, int level) {
 			break;
 
 		case TL_SYM:
-			fprintf(stderr, "SYM: len=%lu hash=%lu: ", obj->len, obj->hash);
-			fwrite(obj->str, obj->len, 1, stderr);
+			fprintf(stderr, "SYM: len=%lu: ", obj->nm->here.len);
+			fwrite(obj->nm->here.data, obj->nm->here.len, 1, stderr);
 			fputc('\n', stderr);
 			break;
 

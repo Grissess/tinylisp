@@ -1,4 +1,4 @@
-OBJ := builtin.o env.o eval.o interp.o object.o print.o read.o debug.o main.o
+OBJ := builtin.o env.o eval.o interp.o object.o print.o read.o debug.o ns.o main.o
 LIB := 
 SRC = $(patsubst %.o,%.c,$(OBJ))
 CFLAGS ?= -g -std=gnu99 -DDEBUG $(DEFINES)
@@ -73,3 +73,6 @@ tl: $(OBJ)
 	$(CC) -shared -o $@ $(CFLAGS) $< $(LDFLAGS)
 
 $(OBJ) $(LIB): tinylisp.h
+
+ns_test: ns.c interp.c object.c builtin.c print.c env.c eval.c read.c
+	$(CC) -DNS_DEBUG $(CFLAGS) $^ -DNS_TEST $(LDFLAGS) -o $@

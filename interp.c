@@ -9,8 +9,7 @@ extern tl_init_ent __start_tl_init_ents, __stop_tl_init_ents;
 static int _readf(tl_interp *in) { return getchar(); }
 static void _writef(tl_interp *in, const char c) { putchar(c); }
 static int _modloadf(tl_interp *in, const char *fn) { return 0; }
-static void *_mallocf(tl_interp *in, size_t n) { return malloc(n); }
-static void _freef(tl_interp *in, void *ptr) { free(ptr); }
+static void *_reallocf(tl_interp *in, void *ptr, size_t s) { return realloc(ptr, s); }
 
 /** Initialize a TinyLISP interpreter.
  *
@@ -33,7 +32,7 @@ static void _freef(tl_interp *in, void *ptr) { free(ptr); }
  */
 
 void tl_interp_init(tl_interp *in) {
-	tl_interp_init_alloc(in, _mallocf, _freef);
+	tl_interp_init_alloc(in, _reallocf);
 }
 
 /** Initialize a TinyLISP interpreter with a custom allocator.
@@ -47,10 +46,17 @@ void tl_interp_init(tl_interp *in) {
  * See tl_interp_init() for other details.
  */
 
-void tl_interp_init_alloc(tl_interp *in, void *(*mallocf)(tl_interp *, size_t), void (*freef)(tl_interp *, void *)) {
-	in->mallocf = mallocf;
-	in->freef = freef;
+void tl_interp_init_alloc(tl_interp *in, void *(*reallocf)(tl_interp *, void *, size_t)) {
+	in->reallocf = reallocf;
+	in->readf = _readf;
+	in->writef = _writef;
+#ifdef CONFIG_MODULES
+	in->modloadf = _modloadf;
+#endif
+
+	tl_ns_init(in, &in->ns);
 	in->top_alloc = NULL;
+
 	in->true_ = tl_new_sym(in, "tl-#t");
 	in->false_ = tl_new_sym(in, "tl-#f");
 	in->error = NULL;
@@ -61,11 +67,6 @@ void tl_interp_init_alloc(tl_interp *in, void *(*mallocf)(tl_interp *, size_t), 
 	in->ctr_events = 0;
 	in->putback = 0;
 	in->is_putback = 0;
-	in->readf = _readf;
-	in->writef = _writef;
-#ifdef CONFIG_MODULES
-	in->modloadf = _modloadf;
-#endif
 
 	in->top_env = TL_EMPTY_LIST;
 
@@ -77,7 +78,7 @@ void tl_interp_init_alloc(tl_interp *in, void *(*mallocf)(tl_interp *, size_t), 
 	while(current != &__stop_tl_init_ents) {
 		top_frm = _tl_frm_set(
 				current->name,
-				current->flags & TL_EF_BYVAL ? tl_new_cfunc_byval(in, current->fn) : tl_new_cfunc(in, current->fn),
+				current->flags & TL_EF_BYVAL ? _tl_new_cfunc_byval(in, current->fn, current->name) : _tl_new_cfunc(in, current->fn, current->name),
 				top_frm
 		);
 		current++;
@@ -97,4 +98,5 @@ void tl_interp_cleanup(tl_interp *in) {
 	while(in->top_alloc) {
 		tl_free(in, in->top_alloc);
 	}
+	tl_ns_free(in, &in->ns);
 }

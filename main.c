@@ -61,6 +61,10 @@ int main() {
 
 	fprintf(stderr, "Top Env: ");
 	tl_print(&in, in.top_env);
+#ifdef NS_DEBUG
+	fprintf(stderr, "Namespace:\n");
+	tl_ns_print(&in, &in.ns);
+#endif
 	fflush(stdout);
 	fprintf(stderr, "\n");
 
@@ -88,5 +92,9 @@ int main() {
 		in.conts = TL_EMPTY_LIST;
 		in.values = TL_EMPTY_LIST;  /* Expected: (tl-#t) due to _main_k */
 		tl_gc(&in);
+#ifdef NS_DEBUG
+		fprintf(stderr, "Namespace:\n");
+		tl_ns_print(&in, &in.ns);
+#endif
 	}
 }

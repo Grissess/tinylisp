@@ -4,7 +4,7 @@
 
 #include "tinylisp.h"
 
-#define QUOTED_SYM_CHARS "0123456789.,'\"`"
+#define QUOTED_SYM_CHARS "0123456789.,'\"` \n\r\t\b\v"
 
 void _print_pairs(tl_interp *in, tl_object *cur) {
 	while(cur) {
@@ -45,12 +45,12 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			break;
 
 		case TL_SYM:
-			if(obj->len == 0 || _mempbrk(obj->str, QUOTED_SYM_CHARS, obj->len)) {
+			if(obj->nm->here.len == 0 || _mempbrk(obj->nm->here.data, QUOTED_SYM_CHARS, obj->nm->here.len)) {
 				tl_putc(in, '"');
-				tl_write(in, obj->str, obj->len);
+				tl_write(in, obj->nm->here.data, obj->nm->here.len);
 				tl_putc(in, '"');
 			} else {
-				tl_write(in, obj->str, obj->len);
+				tl_write(in, obj->nm->here.data, obj->nm->here.len);
 			}
 			break;
 
@@ -101,7 +101,10 @@ void tl_write(tl_interp *in, const char *data, size_t len) {
 
 void tl_printf(tl_interp *in, const char *cur, ...) {
 	va_list ap;
-	const char *s;
+	union {
+		const char *s;
+		tl_buffer *b;
+	} temp;
 	char buf[32];
 
 	va_start(ap, cur);
@@ -119,11 +122,11 @@ void tl_printf(tl_interp *in, const char *cur, ...) {
 					break;
 
 				case 's':
-					s = va_arg(ap, const char *);
-					if(!s)
+					temp.s = va_arg(ap, const char *);
+					if(!temp.s)
 						tl_puts(in, "<NULL>");
 					else
-						tl_puts(in, s);
+						tl_puts(in, temp.s);
 					cur++;
 					break;
 
@@ -137,6 +140,21 @@ void tl_printf(tl_interp *in, const char *cur, ...) {
 					snprintf(buf, 32, "%ld", va_arg(ap, long));
 					tl_puts(in, buf);
 					cur += 2;
+					break;
+
+				case 'd':
+					snprintf(buf, 32, "%d", va_arg(ap, int));
+					tl_puts(in, buf);
+					cur++;
+					break;
+
+				case 'N':  /* non-standard */
+					temp.b = va_arg(ap, tl_buffer *);
+					snprintf(buf, 32, "%ld", temp.b->len);
+					tl_puts(in, buf);
+					tl_putc(in, ':');
+					tl_write(in, temp.b->data, temp.b->len);
+					cur++;
 					break;
 
 				default:

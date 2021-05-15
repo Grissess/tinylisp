@@ -48,8 +48,13 @@ int VXP_NAME(VXP_ARGS const char *fmt, va_list ap) {
 					fmt++;
 					break;
 
+				case 'd':
+					temp.lint = (long)va_arg(ap, int);
+					goto decimal;
+
 				case 'l':  /* XXX d */
 					temp.lint = va_arg(ap, long);
+decimal:
 					i = 1;
 					if(temp.lint < 0) {
 						VXP_PUTC('-');

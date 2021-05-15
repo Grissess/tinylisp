@@ -31,6 +31,7 @@
 #endif
 
 typedef struct tl_interp_s tl_interp;
+typedef struct tl_name_s tl_name;
 
 /** Object structure
  *
@@ -65,14 +66,8 @@ typedef struct tl_object_s {
 	union {
 		/** For \ref TL_INT, the signed long integer value. Note that TL does not internally support unlimited precision. */
 		long ival;
-		struct {
-			/** For \ref TL_SYM, a pointer to a byte array containing the symbol name. The pointed-to memory should be treated as read-only&mdash;if you need a new symbol, make another. */
-			char *str;
-			/** For \ref TL_SYM, the length of the pointed-to byte array. */
-			size_t len;
-			/** For \ref TL_SYM, a hash of the symbol, used to speed up comparison. */
-			unsigned long hash;
-		};
+		/** For \ref TL_SYM, the name in the interpreter's namespace trie, comparable by pointer equality. */
+		tl_name *nm;
 		struct {
 			/** For (non-NULL) \ref TL_PAIR, a pointer to the first of the pair (CAR in traditional LISP). */
 			struct tl_object_s *first;
@@ -175,6 +170,7 @@ TL_EXTERN tl_object *tl_new(tl_interp *);
 TL_EXTERN tl_object *tl_new_int(tl_interp *, long);
 TL_EXTERN tl_object *tl_new_sym(tl_interp *, const char *);
 TL_EXTERN tl_object *tl_new_sym_data(tl_interp *, const char *, size_t);
+TL_EXTERN tl_object *tl_new_sym_name(tl_interp *, tl_name *);
 TL_EXTERN tl_object *tl_new_pair(tl_interp *, tl_object *, tl_object *);
 TL_EXTERN tl_object *tl_new_then(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), tl_object *, const char *);
 TL_EXTERN tl_object *_tl_new_cfunc(tl_interp *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
@@ -252,22 +248,13 @@ TL_EXTERN size_t tl_list_len(tl_object *);
 TL_EXTERN tl_object *tl_list_rvs(tl_interp *, tl_object *);
 TL_EXTERN tl_object *tl_list_rvs_improp(tl_interp *, tl_object *);
 
-/** A tuning threshold for hashing.
- *
- * Only the first `TL_HASH_LINEAR` bytes of a symbol are hashed.
- */
-#define TL_HASH_LINEAR 16
-TL_EXTERN unsigned long tl_data_hash(const char *, size_t);
-
 /** Determine if two symbols are equal.
  *
  * This checks, in the following order, in theory from least to most expensive:
  * - whether `a` and `b` are both TL_SYM;
- * - whether their lengths are the same;
- * - whether their stored hashes are the same;
- * - their byte-for-byte equality.
+ * - whether their names are the same.
  */
-#define tl_sym_eq(a, b) (tl_is_sym(a) && tl_is_sym(b) && (a)->len == (b)->len && (a)->hash == (b)->hash && !memcmp(a->str, b->str, a->len))
+#define tl_sym_eq(a, b) (tl_is_sym(a) && tl_is_sym(b) && (a)->nm == (b)->nm)
 /** Determine if one symbol is "less than" another.
  *
  * The ordering used here is "shortlex"; `a < b` is implied by, in order:
@@ -276,9 +263,14 @@ TL_EXTERN unsigned long tl_data_hash(const char *, size_t);
  *   is lesser in numeric value is less.
  *
  * This is a partial order; if `a` and `b` are not TL_SYM, this is always
- * false. It is never true when `tl_sym_eq(a, b)`.
+ * false. When `a` and `b` are restricted to symbols, it is a total order over
+ * them. It is never true when `tl_sym_eq(a, b)`.
  */
-#define tl_sym_less(a, b) (tl_is_sym(a) && tl_is_sym(b) && ((a)->len < (b)->len && !((b)->len < (a)->len) || memcmp((a)->str, (b)->str, (a)->len) < 0))
+#define tl_sym_less(a, b) (tl_is_sym(a) && tl_is_sym(b) && ((a)->nm->here.len < (b)->nm->here.len && !((b)->nm->here.len < (a)->nm->here.len) || memcmp((a)->nm->here.data, (b)->nm->here.data, (a)->nm->here.len) < 0))
+
+typedef struct tl_ns_s {
+	tl_name *root;
+} tl_ns;
 
 /** The interpreter structure.
  *
@@ -300,6 +292,18 @@ TL_EXTERN unsigned long tl_data_hash(const char *, size_t);
  * evaluation context generally without data races.
  */
 struct tl_interp_s {
+	/** The symbol namespace.
+	 *
+	 * This is the owner of a data structure used to accelerate symbol lookups;
+	 * whenever a symbol is constructed, this structure is consulted to
+	 * efficiently find an object (pointer) unique to the name. Because of this
+	 * property, the names so returned can be compared directly for pointer
+	 * equality.
+	 *
+	 * The current implementation of this structure is a variable-width trie
+	 * with vector-sorted children.
+	 */
+	tl_ns ns;
 	/** The initial environment of the interpreter.
 	 *
 	 * This is initialized to an environment containing all of the builtin
@@ -465,46 +469,32 @@ struct tl_interp_s {
 	 * implementation set by tl_interp_init() does this.
 	 */
 	void (*writef)(struct tl_interp_s *, char);
-	/** Function to allocate memory.
+	/** Function to allocate or free memory.
 	 *
-	 * This function is called to dynamically allocate a contiguous region of
-	 * memory of the given size.
+	 * The arguments are either a pointer previously returned by this function,
+	 * or NULL, as well as a desired size. The function should return a pointer
+	 * to allocated memory of at least the specified size; when the specified
+	 * size is 0, returning NULL is permissible. If the size is greater than 0,
+	 * and the argument pointer is not NULL, the region of memory in the
+	 * returned pointer of the first size argument bytes or
+	 * originally-allocated size bytes (whichever is smaller) should be
+	 * equivalent. If the argument size is less than the originally-allocated
+	 * size, the returned pointer may be the same (which satisfies this
+	 * requirement). The allocator may also expand the area in place, which is
+	 * similarly satisfactory. If the returned allocations don't coincide, the
+	 * allocator is responsible for copying the memory from the old allocation
+	 * before returning it to the free pool.
 	 *
-	 * The arguments are the current interpreter and the size of memory to be
-	 * allocated in bytes.
+	 * These are exactly the POSIX semantics of realloc(), and an entirely
+	 * valid implementation may simply call this function in the current libc.
 	 *
-	 * The return value should be a pointer to such a region, or NULL if the
-	 * request could not be satisfied. TinyLISP will consider it an error if
-	 * the region size was greater than zero and NULL is returned. It is legal
-	 * to return NULL for a request of size 0.
-	 *
-	 * An entirely valid implementation can call `malloc(n)` where `n` is the
-	 * second argument. The default implementation in tl_interp_init() does
-	 * this. Use tl_interp_init_alloc() to change the allocator before
-	 * initialization.
+	 * Pointers given to this function are guaranteed to be previous return
+	 * values of this function only when the interpreter was initialized
+	 * (before tl_interp_init() returns) with the selfsame function. Otherwise,
+	 * implementations may have to expect pointers returned by a previous
+	 * implementation. Use tl_interp_init_alloc() to ensure this guarantee.
 	 */
-	void *(*mallocf)(struct tl_interp_s *, size_t);
-	/** Function to free memory.
-	 *
-	 * This function is called to free a memory allocation previously granted
-	 * by the \ref mallocf function.
-	 *
-	 * The arguments are the current interpreter and a pointer to a previously
-	 * allocated region of memory.
-	 *
-	 * This function does not return and should not fail. TinyLISP can
-	 * guarantee that it is only called with pointers returned by \ref mallocf
-	 * only when tl_interp_init_alloc() is used to initialize the interpreter;
-	 * changing this function after initializing the interpreter requires
-	 * special care and attention given to outstanding allocations, of which
-	 * many exist as soon as the tl_interp_init() returns.
-	 *
-	 * An entirely valid implementation can call `free(ptr)` where `ptr` is the
-	 * second argument. The default implementation in tl_interp_init() does
-	 * this. Use tl_interp_init_alloc() to change the allocator before
-	 * initialization.
-	 */
-	void (*freef)(struct tl_interp_s *, void *);
+	void *(*reallocf)(struct tl_interp_s *, void *, size_t);
 #ifdef CONFIG_MODULES
 	/** Function to load a module.
 	 *
@@ -535,7 +525,7 @@ struct tl_interp_s {
 };
 
 TL_EXTERN void tl_interp_init(tl_interp *);
-TL_EXTERN void tl_interp_init_alloc(tl_interp *, void *(*)(tl_interp *, size_t), void (*)(tl_interp *, void *));
+TL_EXTERN void tl_interp_init_alloc(tl_interp *, void *(*)(struct tl_interp_s *, void *, size_t));
 TL_EXTERN void tl_interp_cleanup(tl_interp *);
 
 /** Set the error state of the interpreter.
@@ -576,18 +566,30 @@ TL_EXTERN void tl_interp_cleanup(tl_interp *);
  */
 #define tl_putc(in, c) ((in)->writef((in), (c)))
 
+/** Invoke the interpreter's memory allocation function.
+ *
+ * See tl_interp::reallocf for details, since this calls that exactly.
+ *
+ * This macro implements also tl_alloc_malloc() and tl_alloc_free().
+ */
+#define tl_alloc_realloc(in, p, n) ((in)->reallocf((in), (p), (n)))
+
 /** Invoke the interpreter's malloc function.
  *
- * See tl_interp::mallocf for details. This is called most often via tl_new(),
+ * See tl_interp::reallocf for details. This is called most often via tl_new(),
  * but also called by other routines which must prepare strings (such as \ref
  * TL_SYM via tl_new_sym() and tl_read()).
  */
-#define tl_alloc_malloc(in, n) ((in)->mallocf((in), (n)))
+#define tl_alloc_malloc(in, n) tl_alloc_realloc(in, NULL, n)
 /** Invoke the interpreter's free function.
  *
- * See tl_interp::freef for details.
+ * See tl_interp::reallocf for details.
+ *
+ * This expression technically has void * result, and the value of this pointer
+ * is returned by the allocator, but it is traditionally ignored (and assumed
+ * to be NULL) throughout TL.
  */
-#define tl_alloc_free(in, ptr) ((in)->freef((in), (ptr)))
+#define tl_alloc_free(in, ptr) tl_alloc_realloc(in, ptr, 0)
 
 char *tl_strdup(tl_interp *, const char *);
 void *tl_calloc(tl_interp *, size_t n, size_t s);
@@ -764,5 +766,34 @@ static tl_init_ent __attribute__((section("tl_init_ents"),aligned(8),used)) init
 void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
 #define TL_CF(func, nm) TL_CF_FLAGS(func, nm, 0)
 #define TL_CFBV(func, nm) TL_CF_FLAGS(func, nm, TL_EF_BYVAL)
+
+#define tl_min(x, y) ((x) < (y) ? (x) : (y))
+
+typedef struct tl_buffer_s {
+	char *data;
+	size_t len;
+} tl_buffer;
+
+struct tl_name_s;
+
+typedef struct tl_child_s {
+	tl_buffer seg;
+	struct tl_name_s *name;
+} tl_child;
+
+typedef struct tl_name_s {
+	tl_buffer here;
+	size_t num_children;
+	size_t sz_children;
+	tl_child *children;
+	struct tl_name_s *chain;
+} tl_name;
+
+void tl_ns_init(tl_interp *, tl_ns *);
+void tl_ns_free(tl_interp *, tl_ns *);
+tl_name *tl_ns_resolve(tl_interp *, tl_ns *, tl_buffer);
+void tl_ns_print(tl_interp *, tl_ns *);
+void tl_ns_for_each(tl_interp *, tl_ns *, void (*)(tl_interp *, tl_ns *, tl_name *, void *), void *);
+tl_buffer tl_buf_slice(tl_interp *, tl_buffer, size_t, size_t);
 
 #endif

@@ -111,7 +111,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 				for(tl_list_iter(in->prefixes, kv)) {
 					tl_object *key = tl_first(kv);
 					tl_object *val = tl_next(kv);
-					if(key && val && tl_is_sym(key) && key->len > 0 && key->str[0] == c) {
+					if(key && val && tl_is_sym(key) && key->nm->here.len > 0 && key->nm->here.data[0] == c) {
 						list = tl_read(in, TL_EMPTY_LIST);
 						return tl_new_pair(in, val, tl_new_pair(in, list, TL_EMPTY_LIST));
 					}

@@ -14,7 +14,7 @@ int _unboolify(tl_interp *in, tl_object *obj) {
 		return obj->ival;
 	}
 	if(tl_is_sym(obj)) {
-		return obj->len > 0;
+		return obj->nm->here.len > 0;
 	}
 	return 1;
 }
@@ -189,14 +189,17 @@ TL_CFBV(concat, "concat") {
 	size_t sz = 0, rsz;
 	for(tl_list_iter(args, val)) {
 		verify_type(in, val, sym, "concat");
-		sz += val->len;
+		sz += val->nm->here.len;
 	}
 	rsz = sz;
 	end = buffer = tl_alloc_malloc(in, sz);
-	if(!buffer) tl_error_set(in, tl_new_sym(in, "out of memory"));
+	if(!buffer) {
+		tl_error_set(in, tl_new_sym(in, "out of memory"));
+		return;
+	}
 	for(tl_list_iter(args, val)) {
-		src = val->str;
-		sz = val->len;
+		src = val->nm->here.data;
+		sz = val->nm->here.len;
 		while(sz > 0) {
 			*end++ = *src++;
 			sz--;
@@ -208,14 +211,18 @@ TL_CFBV(concat, "concat") {
 TL_CFBV(length, "length") {
 	arity_1(in, args, "length");
 	verify_type(in, tl_first(args), sym, "length");
-	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->len));
+	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->nm->here.len));
 }
 
 TL_CFBV(ord, "ord") {
 	arity_n(in, args, 2, "ord");
 	verify_type(in, tl_first(args), sym, "ord");
 	verify_type(in, tl_first(tl_next(args)), int, "ord");
-	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->str[tl_first(tl_next(args))->ival]));
+	if(tl_first(tl_next(args))->ival >= tl_first(args)->nm->here.len) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "ord index out of range"), tl_new_pair(in, tl_first(tl_next(args)), tl_new_int(in, tl_first(args)->nm->here.len))));
+		return;
+	}
+	tl_cfunc_return(in, tl_new_int(in, tl_first(args)->nm->here.data[tl_first(tl_next(args))->ival]));
 }
 
 TL_CFBV(chr, "chr") {
@@ -376,10 +383,10 @@ TL_CFBV(load_mod, "load-mod") {
 	if(!tl_is_sym(name)) {
 		tl_cfunc_return(in, in->false_);
 	}
-	name_cstr = tl_alloc_malloc(in, name->len + 1);
+	name_cstr = tl_alloc_malloc(in, name->nm->here.len + 1);
 	assert(name_cstr);
-	memcpy(name_cstr, name->str, name->len);
-	name_cstr[name->len] = 0;
+	memcpy(name_cstr, name->nm->here.data, name->nm->here.len);
+	name_cstr[name->nm->here.len] = 0;
 	ret = _boolify(in->modloadf(in, name_cstr));
 	free(name_cstr);
 	tl_cfunc_return(in, ret);

@@ -59,16 +59,21 @@ tl_object *tl_new_sym(tl_interp *in, const char *str) {
  * symbols as they would like.
  */
 tl_object *tl_new_sym_data(tl_interp *in, const char *data, size_t len) {
+	tl_buffer buf = {data, len};
+	return tl_new_sym_name(in, tl_ns_resolve(in, &in->ns, buf));
+}
+
+/** Creates a new symbol object by name.
+ *
+ * It's assumed that the name is unique to this symbol and was correctly
+ * initialized, generally by resolving against the interpreter's own namespace.
+ * This isn't enforced, however, and this mechanism could theoretically be used
+ * to introduce entirely hygienic symbols.
+ */
+tl_object *tl_new_sym_name(tl_interp *in, tl_name *name) {
 	tl_object *obj = tl_new(in);
-	char *copy = NULL;
-	if(len > 0) {
-		copy = tl_alloc_malloc(in, len);
-		memcpy(copy, data, len);
-	}
 	obj->kind = TL_SYM;
-	obj->str = copy;
-	obj->len = len;
-	obj->hash = tl_data_hash(copy, len);
+	obj->nm = name;
 	return obj;
 }
 
@@ -176,10 +181,6 @@ void tl_free(tl_interp *in, tl_object *obj) {
 		tl_next_alloc(obj)->prev_alloc = obj->prev_alloc;
 	}
 	switch(obj->kind) {
-		case TL_SYM:
-			tl_alloc_free(in, obj->str);
-			break;
-
 		case TL_CFUNC:
 		case TL_CFUNC_BYVAL:
 		case TL_THEN:
@@ -296,28 +297,6 @@ tl_object *tl_list_rvs_improp(tl_interp *in, tl_object *l) {
 	l = tl_next(l);
 	for(tl_list_iter(l, item)) res = tl_new_pair(in, item, res);
 	return res;
-}
-
-/** Internal function for computing the hash of data.
- *
- * This is used to accelerate symbol lookups.
- */
-unsigned long tl_data_hash(const char *data, size_t len) {
-	unsigned long ret = 0, a = 0x848c848c;
-	unsigned char samt;
-	size_t i, end = len > TL_HASH_LINEAR ? TL_HASH_LINEAR : len;
-
-	for(i = 0; i < end; i++) {
-		ret = (ret << 8) | (data[i] ^ (ret >> (sizeof(unsigned long) * 8 - 8)));
-		if(i & 0x1) {
-			ret ^= a;
-			samt = ret & 0xF;
-			a = (a << samt) | (a >> (sizeof(unsigned long) * 8 - samt));
-		}
-		ret = (ret << 8) | (data[len - i - 1] ^ (ret >> (sizeof(unsigned long) * 8 - 8)));
-	}
-
-	return ret;
 }
 
 /** Copies a C string into another C string.

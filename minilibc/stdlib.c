@@ -188,3 +188,26 @@ void free(void *area) {
 	mem_sanity();
 #endif
 }
+
+void *realloc(void *ptr, size_t n) {
+	void *new;
+	size_t sz;
+
+	if(!n) {
+		free(ptr);
+		return NULL;
+	}
+	if(!ptr) {
+		return malloc(n);
+	}
+
+	/* TODO: be more clever about expanding/contracting the allocation */
+	sz = fl_size(((struct freelist *)ptr) - 1);
+	if(n <= sz) {
+		/* Could shrink the allocation here */
+		return ptr;
+	}
+	new = malloc(n);
+	memcpy(new, ptr, sz);
+	return new;
+}
