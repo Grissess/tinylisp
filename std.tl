@@ -165,6 +165,10 @@
   (macro (expr) environ
 		 (tl-eval-in& environ expr (lambda (ex) (tl-eval-in environ ex)))))
 
+(define apply
+  (lambda (f a)
+	(eval (cons f a))))
+
 (define caar
   (lambda (l)
 	(car (car l))))
@@ -352,3 +356,19 @@
 	  ((null? a) '())
 	  ((= k (caar a)) (del-assoc k (cdr a)))
 	  (else (cons (car a) (del-assoc k (cdr a)))))))
+
+; loop/recur
+
+(define tl-loop-co-sym '#tl-loop)
+
+(define loop
+  (macro (bindings . body) env
+		 (tl-eval-in env `(apply (lambda ,(cons tl-loop-co-sym (map car bindings))
+								   @body
+								   )
+								 (call/cc (lambda (co) (cons co (quote ,(map cadr bindings)))))))))
+
+(define recur
+  (macro args env
+		 (tl-eval-in env
+					 `((eval ,tl-loop-co-sym) (list (eval ,tl-loop-co-sym) @args)))))
