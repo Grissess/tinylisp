@@ -8,6 +8,7 @@
 (define error tl-error)
 (define lambda tl-lambda)
 (define macro tl-macro)
+(define apply tl-apply)
 (define set! tl-set!)
 (define display tl-display)
 (define if tl-if)
@@ -164,10 +165,6 @@
 (define eval
   (macro (expr) environ
 		 (tl-eval-in& environ expr (lambda (ex) (tl-eval-in environ ex)))))
-
-(define apply
-  (lambda (f a)
-	(eval (cons f a))))
 
 (define caar
   (lambda (l)

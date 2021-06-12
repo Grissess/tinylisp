@@ -359,6 +359,19 @@ TL_CFBV(type, "type") {
 	tl_cfunc_return(in, tl_new_sym(in, "unknown"));
 }
 
+TL_CFBV(apply, "apply") {
+	tl_object *cur;
+	size_t len;
+
+	arity_n(in, args, 2, "apply");
+	cur = tl_first(tl_next(args));
+	for(len = 0; cur; cur = tl_next(cur), len++) {
+		tl_values_push(in, tl_first(cur));
+	}
+	tl_values_push(in, tl_first(args));
+	tl_push_apply(in, TL_APPLY_INDIRECT, tl_new_int(in, len), in->env);
+}
+
 TL_CFBV(gc, "gc") {
 	tl_gc(in);
 	tl_cfunc_return(in, in->true_);
