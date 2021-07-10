@@ -432,6 +432,12 @@ struct tl_interp_s {
 	int putback;
 	/** Whether or not `tl_getc` will return the last "putback". */
 	int is_putback;
+	/** The character `tl-display` writes between arguments.
+	 *
+	 * This can be set at runtime with tl-display-sep. By default, it is '\t'
+	 * (a tab character).
+	 */
+	char disp_sep;
 	/** An opaque "user data" pointer for use with interface functions.
 	 *
 	 * This value is stored but never modified by TinyLISP; it is not even

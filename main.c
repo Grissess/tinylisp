@@ -1,6 +1,10 @@
 #include <stdio.h>
 #include <stdarg.h>
 
+#ifdef UNIX
+#include <unistd.h>
+#endif
+
 #include "tinylisp.h"
 
 tl_interp *_global_in;
@@ -22,18 +26,41 @@ int my_modloadf(tl_interp *in, const char *fname) {
 }
 #endif
 
+#define QUIET_OFF (0)
+#define QUIET_NO_PROMPT (1)
+#define QUIET_NO_TRUE (2)
+#define QUIET_NO_VALUE (3)
+int quiet = QUIET_OFF;
+#define tl_prompt(...) if(quiet == QUIET_OFF) fprintf(stderr, __VA_ARGS__)
+
 void _main_k(tl_interp *in, tl_object *result, tl_object *_) {
-	fprintf(stderr, "Value: ");
-	tl_print(in, tl_first(result));
+	tl_prompt("Value: ");
+	if(quiet != QUIET_NO_VALUE && (quiet != QUIET_NO_TRUE || tl_first(result) != in->true_)) {
+		tl_print(in, tl_first(result));
+		tl_printf(in, "\n");
+	}
 	fflush(stdout);
-	fprintf(stderr, "\n");
 	if(in->values) {
-		fprintf(stderr, "(Rest of stack: ");
+		tl_prompt("(Rest of stack: ");
 		tl_print(in, in->values);
 		fflush(stdout);
-		fprintf(stderr, ")\n");
+		tl_prompt(")\n");
 	}
 	tl_cfunc_return(in, in->true_);
+}
+
+TL_CFBV(quiet, "quiet") {
+	if(args) {
+		tl_object *arg = tl_first(args);
+		if(tl_is_int(arg)) {
+			quiet = (int) arg->ival;
+			tl_cfunc_return(in, in->true_);
+		} else {
+			tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "tl-quiet on non-int"), arg));
+		}
+	} else {
+		tl_cfunc_return(in, tl_new_int(in, (long) quiet));
+	}
 }
 
 #ifdef CONFIG_MODULES_BUILTIN
@@ -47,6 +74,12 @@ int main() {
 
 	_global_in = &in;
 
+#ifdef UNIX
+	if(!isatty(STDIN_FILENO)) {
+		quiet = QUIET_NO_TRUE;
+	}
+#endif
+
 	tl_interp_init(&in);
 #ifdef CONFIG_MODULES
 	in.modloadf = my_modloadf;
@@ -59,30 +92,35 @@ int main() {
 	}
 #endif
 
-	fprintf(stderr, "Top Env: ");
-	tl_print(&in, in.top_env);
+	if(quiet == QUIET_OFF) {
+		tl_prompt("Top Env: ");
+		tl_print(&in, in.top_env);
 #ifdef NS_DEBUG
-	fprintf(stderr, "Namespace:\n");
-	tl_ns_print(&in, &in.ns);
+		tl_prompt("Namespace:\n");
+		tl_ns_print(&in, &in.ns);
 #endif
-	fflush(stdout);
-	fprintf(stderr, "\n");
+		fflush(stdout);
+		tl_prompt("\n");
+	}
 
 	while(1) {
-		fprintf(stderr, "> ");
+		tl_prompt("> ");
 		expr = tl_read(&in, TL_EMPTY_LIST);
 		if(!expr) {
-			printf("Done.\n");
+			tl_prompt("Done.\n");
 			tl_interp_cleanup(&in);
 			return 0;
 		}
-		fprintf(stderr, "Read: ");
-		tl_print(&in, expr);
-		fflush(stdout);
-		fprintf(stderr, "\n");
+		if(quiet == QUIET_OFF) {
+			tl_prompt("Read: ");
+			tl_print(&in, expr);
+			fflush(stdout);
+			tl_prompt("\n");
+		}
 		tl_eval_and_then(&in, expr, NULL, _main_k);
 		tl_run_until_done(&in);
 		if(in.error) {
+			/* Don't change these to tl_prompt--errors are always exceptional */
 			fprintf(stderr, "Error: ");
 			tl_print(&in, in.error);
 			fflush(stdout);
@@ -93,7 +131,7 @@ int main() {
 		in.values = TL_EMPTY_LIST;  /* Expected: (tl-#t) due to _main_k */
 		tl_gc(&in);
 #ifdef NS_DEBUG
-		fprintf(stderr, "Namespace:\n");
+		tl_prompt("Namespace:\n");
 		tl_ns_print(&in, &in.ns);
 #endif
 	}

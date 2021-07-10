@@ -5,10 +5,12 @@ CFLAGS ?= -g -std=gnu99 -DDEBUG $(DEFINES)
 LDFLAGS ?= 
 DESTDIR ?= /usr/local/
 CC ?= gcc
+PLAT ?= UNIX  # TODO: figure this out somehow
 
 ALL_MODULES = io
 MODULES ?= all
 MODULES_BUILTIN ?=
+CFLAGS += -D$(PLAT)
 
 ifeq ($(MODULES),all)
 	MODULES := $(ALL_MODULES)

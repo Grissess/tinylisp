@@ -78,9 +78,27 @@ TL_CF(define, "define") {
 TL_CFBV(display, "display") {
 	for(tl_list_iter(args, arg)) {
 		tl_print(in, arg);
-		if(tl_next(l_arg)) tl_printf(in, "\t");
+		if(tl_next(l_arg)) tl_putc(in, in->disp_sep);
 	}
 	tl_printf(in, "\n");
+	tl_cfunc_return(in, in->true_);
+}
+
+TL_CFBV(display_sep, "display-sep") {
+	tl_object *arg;
+	if(!args) {
+		tl_cfunc_return(in, tl_new_sym_data(in, &in->disp_sep, 1));
+	}
+	arg = tl_first(args);
+	if(!tl_is_sym(arg)) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "tl-display-sep with non-sym"), arg));
+		tl_cfunc_return(in, in->false_);
+	}
+	if(!arg->nm->here.len) {
+		tl_error_set(in, tl_new_sym(in, "tl-display-sep with empty sym"));
+		tl_cfunc_return(in, in->false_);
+	}
+	in->disp_sep = arg->nm->here.data[0];
 	tl_cfunc_return(in, in->true_);
 }
 
@@ -98,6 +116,7 @@ TL_CFBV(evalin, "eval-in&") {
 	tl_object *k = tl_first(tl_next(tl_next(args)));
 	tl_push_apply(in, 1, k, in->env);
 	tl_push_eval(in, expr, env);
+	tl_cfunc_return(in, in->true_);  /* Stack discipline requires this */
 }
 
 TL_CFBV(call_with_current_continuation, "call-with-current-continuation") {
