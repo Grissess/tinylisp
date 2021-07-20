@@ -114,7 +114,17 @@ int tl_apply_next(tl_interp *in) {
 	tl_print(in, in->conts);
 	tl_printf(in, "\n");
 	*/
-	if(tl_has_error(in)) return 0;
+	if(tl_has_error(in)) {
+		tl_object *rescue = tl_rescue_peek(in);
+		if(!rescue) return 0;
+		tl_rescue_drop(in);
+		/* Trampoline into the rescue continuation--we could do this directly,
+		 * but why reinvent the wheel? */
+		tl_push_apply(in, 1, rescue, in->env);
+		tl_values_push(in, in->error);
+		tl_error_clear(in);
+		return 1;
+	}
 	if(!cont) return 0;
 	in->conts = tl_next(in->conts);
 	assert(tl_is_int(tl_first(cont)));
@@ -128,6 +138,10 @@ int tl_apply_next(tl_interp *in) {
 #endif
 	if(len == TL_APPLY_DROP) {
 		in->values = tl_next(in->values);
+		return 1;
+	}
+	if(len == TL_APPLY_DROP_RESCUE) {
+		tl_rescue_drop(in);
 		return 1;
 	}
 	if(len != TL_APPLY_INDIRECT) {

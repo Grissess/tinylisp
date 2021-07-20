@@ -59,7 +59,7 @@ tl_object *tl_new_sym(tl_interp *in, const char *str) {
  * symbols as they would like.
  */
 tl_object *tl_new_sym_data(tl_interp *in, const char *data, size_t len) {
-	tl_buffer buf = {data, len};
+	tl_buffer buf = {(char *) data, len};  /* Discard constness--it won't mutate anyway */
 	return tl_new_sym_name(in, tl_ns_resolve(in, &in->ns, buf));
 }
 

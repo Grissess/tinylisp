@@ -420,3 +420,16 @@ TL_CFBV(load_mod, "load-mod") {
 	tl_cfunc_return(in, in->false_);
 #endif
 }
+
+TL_CFBV(rescue, "rescue") {
+	tl_object *func, *cont;
+
+	arity_1(in, args, "rescue");
+	func = tl_first(args);
+	verify_type(in, func, callable, "rescue");
+
+	cont = tl_new_cont(in, in->env, in->conts, in->values);
+	tl_rescue_push(in, cont);
+	tl_push_apply(in, TL_APPLY_DROP_RESCUE, TL_EMPTY_LIST, TL_EMPTY_LIST);
+	tl_push_apply(in, 0, func, in->env);
+}

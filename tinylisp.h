@@ -412,6 +412,18 @@ struct tl_interp_s {
 	 * this field's documentation.
 	 */
 	tl_object *values;
+	/** The "rescue stack".
+	 *
+	 * Each call to the `tl-rescue` builtin pushes a continuation object onto
+	 * this stack, which is popped if the callable returns normally. When the
+	 * interpreter encounters an error, while unwinding the stack, it will
+	 * prefer instead to call the continuation with the error, popping that
+	 * continuation off the stack internally. If this stack is empty (the
+	 * toplevel context), the error propagates to the application as usual.
+	 * (The REPL in `main.c` simply prints the error and grabs the next input
+	 * line.)
+	 */
+	tl_object *rescue;
 	/** The number of "events" before `tl_gc` is automatically called by `tl_push_apply`.
 	 *
 	 * Note that this happens regardless of memory pressure. A smarter
@@ -670,6 +682,25 @@ TL_EXTERN void tl_printf(tl_interp *, const char *, ...);
 	var = tl_first(tl_first((in)->values)); \
 	(in)->values = tl_next((in)->values); \
 } while(0)
+/** Push a rescue continuation onto the rescue stack.
+ *
+ * The arguments should be an interpreter and a continuation object (but this
+ * is not checked). The top continuation on this stack is called,
+ * preferentially, during a stack unwind when the interpreter encounters an
+ * error, if present.
+ */
+#define tl_rescue_push(in, cont) (in)->rescue = tl_new_pair((in), (cont), (in)->rescue);
+/** Peek at the top continuation of the rescue stack.
+ *
+ * This should return either a continuation object, or NULL.
+ */
+#define tl_rescue_peek(in) tl_first((in)->rescue)
+/** Drop the top continuation of the rescue stack.
+ *
+ * Note that this macro does not return the continuation; use it after
+ * tl_rescue_peek.
+ */
+#define tl_rescue_drop(in) (in)->rescue = tl_next((in)->rescue)
 /** Return a value from a C function.
  *
  * All C functions must return a value (`true_` is a good candidate if no other
@@ -715,6 +746,12 @@ TL_EXTERN int tl_push_eval(tl_interp *, tl_object *, tl_object *);
  * which is indeed a rare circumstance.
  */
 #define TL_APPLY_DROP -4
+/** A special continuation flag that drops the top of the rescue stack.
+ *
+ * This is left behind by `tl-rescue` to indicate when its callable is
+ * finished.
+ */
+#define TL_APPLY_DROP_RESCUE -5
 TL_EXTERN void tl_push_apply(tl_interp *, long, tl_object *, tl_object *);
 TL_EXTERN int tl_apply_next(tl_interp *);
 TL_EXTERN void _tl_eval_and_then(tl_interp *, tl_object *, tl_object *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
