@@ -1,11 +1,27 @@
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #ifdef UNIX
 #include <unistd.h>
 #endif
 
 #include "tinylisp.h"
+
+#ifdef INITSCRIPTS
+extern char __start_tl_init_scripts, __stop_tl_init_scripts;
+
+static int _postscript_readf(tl_interp *in) { return getchar(); }
+
+static int _initscript_readf(tl_interp *in) {
+	static char *ptr = &__start_tl_init_scripts;
+	if(ptr >= &__stop_tl_init_scripts) {
+		in->readf = _postscript_readf;
+		return _postscript_readf(in);
+	}
+	return (int) *ptr++;
+}
+#endif
 
 tl_interp *_global_in;
 
@@ -63,6 +79,14 @@ TL_CFBV(quiet, "quiet") {
 	}
 }
 
+TL_CFBV(exit, "exit") {
+	if(!args || !tl_is_int(tl_first(args))) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "tl-quit on non-int"), args));
+		tl_cfunc_return(in, in->false_);
+	}
+	exit(tl_first(args)->ival);
+}
+
 #ifdef CONFIG_MODULES_BUILTIN
 extern void *__start_tl_bmcons;
 extern void *__stop_tl_bmcons;
@@ -83,6 +107,9 @@ int main() {
 	tl_interp_init(&in);
 #ifdef CONFIG_MODULES
 	in.modloadf = my_modloadf;
+#endif
+#ifdef INITSCRIPTS
+	in.readf = _initscript_readf;
 #endif
 #ifdef CONFIG_MODULES_BUILTIN
 	{

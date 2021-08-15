@@ -214,3 +214,8 @@ void *realloc(void *ptr, size_t n) {
 	memcpy(new, ptr, sz);
 	return new;
 }
+
+void exit(int status) {
+	fprintf(stderr, "exit: program called exit() with status %d\n", status);
+	arch_halt(status);
+}

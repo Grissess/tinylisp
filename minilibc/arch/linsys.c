@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdint.h>
 
 #include "../arch.h"
 
@@ -46,7 +47,7 @@ void arch_fputc(unsigned long hdl, char c) {
 	register void *sz asm ("rdx") = (void *) 1;
 	register void *ret asm ("rax");
 	asm volatile ("syscall" : "=r" (ret) : "r" (sysno), "r" (fdesc), "r" (buf), "r" (sz));
-	if(((long) ret) < 0) arch_halt();
+	if(((long) ret) < 0) arch_halt(_HALT_ERROR);
 }
 
 int arch_fgetc(unsigned long hdl) {
@@ -64,10 +65,10 @@ int arch_fgetc(unsigned long hdl) {
 	return c;
 }
 
-void arch_halt() {
+void arch_halt(int status) {
 	while(1) {
 		register void *sysno asm ("rax") = (void *) SYS_EXIT;
-		register void *stat asm ("rdi") = (void *) 0;
+		register void *stat asm ("rdi") = (void *)(intptr_t)status;
 		asm volatile ("syscall" : : "r" (sysno), "r" (stat));
 	}
 }
@@ -82,10 +83,10 @@ void arch_init_heap(void **region, size_t *sz) {
 	register void *offset asm ("r9") = (void *) 0;
 	register void *ret asm ("rax");
 	asm volatile ("syscall" : "=r" (ret) : "r" (sysno), "r" (addr), "r" (size), "r" (prot), "r" (flags), "r" (fd), "r" (offset));
-	if(ret == MAP_FAILED) arch_halt();
+	if(ret == MAP_FAILED) arch_halt(_HALT_ERROR);
 	*region = ret;
 	*sz = HEAP_SIZE;
 }
 
 int main();
-void _start() { main(); arch_halt(); }
+void _start() { main(); arch_halt(0); }
