@@ -9,6 +9,72 @@ CC ?= gcc
 PLAT ?= UNIX  # TODO: figure this out somehow
 V ?= 1
 
+define newline
+
+
+endef
+
+define help_text
+Type 'make' (or make -jN, for N parallel jobs) to make TinyLISP.
+
+Targets (pass ONE of these to make):
+	tl: the TinyLISP executable.
+	all: equivalent to tl.
+	dist: the tinylisp.tar.xz source tarball.
+	clean: remove tl and all build intermediates.
+	install: install tl to DESTDIR
+		(currently, DESTDIR = $(DESTDIR))
+	ns_test: the namespace test program.
+	help: this message.
+	showconfig: show important variables (for debugging).
+
+Influential variables (and their current values):
+	CC = $(CC)
+		Your C compiler.
+
+	CFLAGS = $(CFLAGS)
+		Additional options for your C compiler.
+
+	LD = $(LD)
+		Your linker.
+
+	LDFLAGS = $(LDFLAGS)
+		Additional options for your linker.
+
+	PLAT = $(PLAT)
+		Your platform:
+			UNIX: Something that resembles POSIX.
+			WINDOWS: Something that resembles Windows.
+ 	
+	USE_MINILIBC = $(USE_MINILIBC)
+		If nonempty, use Minilibc (a minimal C library)
+		and build tl statically. (This also affects
+		modules, see below.)
+
+	MODULES = $(MODULES)
+		Modules to build. These will be built as shared
+		objects (libraries) unless USE_MINILIBC is set,
+		in which case they will be statically linked
+		and run at program start.
+
+		If the value is "all", all modules this Makefile
+		knows about will be built:
+			ALL_MODULES = $(ALL_MODULES)
+
+	INITSCRIPTS = $(INITSCRIPTS)
+		Initscripts that will be run for tl (specifically,
+		not other embedders) before any user input is
+		processed. Scripts will be embedded and run in
+		exactly the specified order.
+
+	V = $(V)
+		Build verbosity:
+			0: Output nothing except compiler errors.
+			1: Output a simplified line (and the above).
+			2: Show the full command line, as usual.
+			3: Show everything, including this infrastructure.
+endef
+
 ALL_MODULES = io
 MODULES ?= all
 MODULES_BUILTIN ?=
@@ -63,7 +129,7 @@ ifeq ($(V),3)
 	cmd = printf 'rule $(1): $(cmd_$(1))'; $(cmd_$(1))
 endif
 
-.PHONY: all clean run dist docs showconfig
+.PHONY: all clean run dist docs showconfig help
 .PRECIOUS: $(INITSCRIPTS)
 .SUFFIXES:
 
@@ -79,6 +145,9 @@ endef
 quiet_showconfig = SHOWCONFIG
 showconfig:
 	$(call cmd,showconfig)
+
+help:
+	@printf "$(subst $(newline),\n,$(help_text))\n"
 
 cmd_run = cat std.tl - | $(DEBUGGER) ./tl
 quiet_run = RUN
