@@ -18,7 +18,7 @@ endif
 
 ifneq ($(USE_MINILIBC),)
 	CFLAGS += -Iminilibc -nostdlib -nostartfiles -static
-	OBJ += $(patsubst %,minilibc/%.o,string stdio assert stdlib ctype)
+	OBJ += $(patsubst %,minilibc/%.o,string stdio assert stdlib ctype unistd)
 	MINILIBC_ARCH ?= linsys
 	OBJ += minilibc/arch/$(MINILIBC_ARCH).o
 	MODULES_BUILTIN := $(MODULES)
