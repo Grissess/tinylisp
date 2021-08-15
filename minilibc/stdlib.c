@@ -89,6 +89,9 @@ void *malloc(size_t b) {
 	if(!root) {
 		size_t s;
 		arch_init_heap((void **) &root, &s);
+#ifdef MEM_DEBUG
+		fprintf(stderr, "malloc: init heap at %p size %p\n", root, s);
+#endif
 		assert(root);
 		freeroot = (struct freelist *)(((char *) root) + s - sizeof(struct freelist));
 		freeroot->next = NULL;
