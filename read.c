@@ -1,18 +1,33 @@
 #include <stdlib.h>
 #include <ctype.h>
+#include <assert.h>
 
 #include "tinylisp.h"
 
-#ifndef MAX_SYM_LEN
-/** The absolute maximum size of a symbol read can handle, in bytes. */
-#define MAX_SYM_LEN 64
+#ifndef DEFAULT_SYM_LEN
+/** The default size of a symbol buffer, in bytes.
+ *
+ * It's more time-efficient to keep this small, but allowing it to grow is more
+ * space-efficient. The growth algorithm is exponential.
+ */
+#define DEFAULT_SYM_LEN 64
 #endif
 
 /** A helper macro to return a TL_SYM from a C string which was allocated using malloc(). */
-#define return_sym_from_cstr(in, s) do { \
-	tl_object *ret = tl_new_sym((in), (s)); \
+#define return_sym_from_buf(in, s, sz) do { \
+	tl_object *ret = tl_new_sym_data((in), (s), (sz)); \
 	free((s)); \
 	return ret; \
+} while(0)
+
+/** A helper macro to add another character to the buffer. */
+#define add_to_cstr(in, buf, sz, idx, c) do { \
+	buf[idx++] = c; \
+	if(idx >= sz) { \
+		sz <<= 1; \
+		buf = tl_alloc_realloc(in, buf, sz); \
+		assert(buf); \
+	} \
 } while(0)
 
 /* FIXME: NULL and TL_EMPTY_LIST are the same; empty list can signal EOF */
@@ -33,10 +48,11 @@
  * (`TL_EMPTY_LIST`) of the syntax `()` and a `NULL` return due to EOF.
  */
 tl_object *tl_read(tl_interp *in, tl_object *args) {
-	int c, d, q, idx = 0;
+	int c, d, q;
 	long ival = 0;
 	tl_object *list = TL_EMPTY_LIST;
 	char *symbuf;
+	size_t idx = 0, bufsz = DEFAULT_SYM_LEN;
 
 	while(1) {
 		switch(c = tl_getc(in)) {
@@ -91,11 +107,13 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 
 			case '"':
 				q = c;
-				symbuf = tl_calloc(in, MAX_SYM_LEN + 1, sizeof(char));
-				while(idx < MAX_SYM_LEN && (d = in->readf(in)) != q) {
-					symbuf[idx++] = d;
+				symbuf = tl_alloc_malloc(in, bufsz);
+				assert(symbuf);
+				while((d = in->readf(in)) != q) {
+					if(d == EOF) break;  // TODO: reject
+					add_to_cstr(in, symbuf, bufsz, idx, (char) d);
 				}
-				return_sym_from_cstr(in, symbuf);
+				return_sym_from_buf(in, symbuf, idx);
 				break;
 
 			default:
@@ -116,25 +134,26 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 						return tl_new_pair(in, val, tl_new_pair(in, list, TL_EMPTY_LIST));
 					}
 				}
-				symbuf = tl_calloc(in, MAX_SYM_LEN + 1, sizeof(char));
-				symbuf[idx++] = c;
-				while(idx < MAX_SYM_LEN) {
+				symbuf = tl_alloc_malloc(in, bufsz);
+				add_to_cstr(in, symbuf, bufsz, idx, c);
+				while(1) {
 					switch(d = tl_getc(in)) {
-						case ' ': case '\n': case '\t': case '\v': case '\r': case '\b':
-							return_sym_from_cstr(in, symbuf);
+						case ' ': case '\n': case '\t': case '\v': case '\r': case '\b': case EOF:
+							// TODO: fix EOF case
+							return_sym_from_buf(in, symbuf, idx);
 							break;
 
 						case '(': case ')':
 							tl_putback(in, d);
-							return_sym_from_cstr(in, symbuf);
+							return_sym_from_buf(in, symbuf, idx);
 							break;
 
 						default:
-							symbuf[idx++] = d;
+							add_to_cstr(in, symbuf, bufsz, idx, (char) d);
 							break;
 					}
 				}
-				return_sym_from_cstr(in, symbuf);
+				return_sym_from_buf(in, symbuf, idx);
 				break;
 		}
 	}
