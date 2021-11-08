@@ -35,6 +35,9 @@ Influential variables (and their current values):
 	CFLAGS = $(CFLAGS)
 		Additional options for your C compiler.
 
+	DEFINES = $(DEFINES)
+		Items that will be appended to CFLAGS.
+
 	LD = $(LD)
 		Your linker.
 

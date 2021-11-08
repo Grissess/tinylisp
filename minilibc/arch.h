@@ -15,6 +15,7 @@ void arch_fflush(unsigned long);
 void arch_fputc(unsigned long, char);
 int arch_fgetc(unsigned long);
 void _NORETURN arch_halt(int);
-void arch_init_heap(void **, size_t *);
+void arch_new_heap(size_t, void **, size_t *);
+void arch_release_heap(void *, size_t);
 
 #endif

@@ -7,6 +7,7 @@
 #define SYS_WRITE 1
 #define SYS_EXIT 60
 #define SYS_MMAP 9
+#define SYS_MUNMAP 11
 
 #define PROT_READ 0x1
 #define PROT_WRITE 0x2
@@ -19,7 +20,7 @@
 #define MAP_FAILED ((void *) -1)
 
 #ifndef HEAP_SIZE
-#define HEAP_SIZE (256*1024*1024)
+#define HEAP_SIZE (16*1024*1024)
 #endif
 
 void arch_fflush(unsigned long _) {}
@@ -73,19 +74,28 @@ void arch_halt(int status) {
 	}
 }
 
-void arch_init_heap(void **region, size_t *sz) {
+void arch_new_heap(size_t min_sz, void **region, size_t *sz) {
 	register void *sysno asm ("rax") = (void *) SYS_MMAP;
 	register void *addr asm ("rdi") = (void *) 0;
-	register void *size asm ("rsi") = (void *) HEAP_SIZE;
+	register void *size asm ("rsi") = (void *) (min_sz > HEAP_SIZE ? min_sz : HEAP_SIZE);
 	register void *prot asm ("rdx") = (void *) (PROT_READ | PROT_WRITE);
-	register void *flags asm ("r10") = (void *) (MAP_SHARED | MAP_ANONYMOUS);
+	register void *flags asm ("r10") = (void *) (MAP_PRIVATE | MAP_ANONYMOUS);
 	register void *fd asm ("r8") = (void *) 0;
 	register void *offset asm ("r9") = (void *) 0;
 	register void *ret asm ("rax");
 	asm volatile ("syscall" : "=r" (ret) : "r" (sysno), "r" (addr), "r" (size), "r" (prot), "r" (flags), "r" (fd), "r" (offset));
-	if(ret == MAP_FAILED) arch_halt(_HALT_ERROR);
+	if(ret == MAP_FAILED) ret = NULL;
 	*region = ret;
-	*sz = HEAP_SIZE;
+	*sz = (size_t) size;
+}
+
+void arch_release_heap(void *region, size_t sz) {
+	register void *sysno asm ("rax") = (void *) SYS_MUNMAP;
+	register void *addr asm ("rdi") = region;
+	register void *size asm ("rsi") = (void *) sz;
+	register void *ret asm ("rax");
+	asm volatile ("syscall" : "=r" (ret) : "r" (sysno), "r" (addr), "r" (size));
+	if(ret) arch_halt(_HALT_ERROR);
 }
 
 int main();

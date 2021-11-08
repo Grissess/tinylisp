@@ -22,24 +22,38 @@
 #define fl_real_size(fl) ((size_t)(((fl) && fl_next((fl))) ? ((size_t) fl_next((fl))) - ((size_t) (fl)) : BAD_SIZE))
 #define fl_size(fl) (fl_real_size((fl)) == BAD_SIZE || fl_real_size((fl)) < sizeof(struct freelist) ? BAD_SIZE : fl_real_size((fl)) - sizeof(struct freelist))
 
+struct arena;
+
 struct freelist {
+	struct arena *arena;
 	struct freelist *next;
 	struct freelist *nextfree;
 	struct freelist *prevfree;
 #ifdef MEM_DEBUG
 	char is_used;
 #endif
-} *root = NULL, *freeroot = NULL;
+};
+
+struct arena {
+	struct freelist *root, *freeroot;
+	size_t size;
+	struct arena *next;
+#ifdef MEM_DEBUG
+	struct freelist *sentinel;
+#endif
+} *alist = NULL;
+
+#define MIN_HEADER_SIZE (sizeof(struct freelist) * 2 + sizeof(struct arena))
 
 #ifdef MEM_DEBUG
-char *orig_root = NULL;
-size_t orig_size = 0;
-struct freelist *end_ptr;
 
-static void mem_sanity() {
+static void mem_sanity(struct arena *arena) {
 	struct freelist *cur, *prev;
+	char *orig_root = (char *) arena->root;
+	size_t orig_size = arena->size;
+	struct freelist *end_ptr = arena->sentinel;
 
-	cur = root;
+	cur = arena->root;
 	while(cur) {
 		if(((char *) cur) < orig_root || ((char *) cur) >= (orig_root + orig_size)) {
 			fprintf(stderr, "sanity: CRITICAL: %p outside of original arena %p - %p -- while scanning root list -- aborting test\n", cur, orig_root, orig_root + orig_size);
@@ -56,7 +70,7 @@ static void mem_sanity() {
 		cur = fl_next(cur);
 	}
 
-	cur = freeroot;
+	cur = arena->freeroot;
 	prev = NULL;
 	while(cur) {
 		if(((char *) cur) < orig_root || ((char *) cur) >= (orig_root + orig_size)) {
@@ -77,7 +91,7 @@ static void mem_sanity() {
 }
 #endif
 
-void *malloc(size_t b) {
+void *malloc_in_arena(struct arena *arena, size_t b) {
 	struct freelist *cur, *next, *nf;
 	void *area;
 	char split = 1;
@@ -86,41 +100,18 @@ void *malloc(size_t b) {
 	if(b == 0) return NULL;
 	if(b & 0x7) b = (b + 7) & (~0x7);
 
-	if(!root) {
-		size_t s;
-		arch_init_heap((void **) &root, &s);
-#ifdef MEM_DEBUG
-		fprintf(stderr, "malloc: init heap at %p size %p\n", root, s);
-#endif
-		assert(root);
-		freeroot = (struct freelist *)(((char *) root) + s - sizeof(struct freelist));
-		freeroot->next = NULL;
-		freeroot->nextfree = NULL;
-		freeroot->prevfree = root;
-		root->next = freeroot;
-		root->nextfree = freeroot;
-		root->prevfree = NULL;
-#ifdef MEM_DEBUG
-		orig_root = (void *) root;
-		orig_size = s;
-		freeroot->is_used = 0;
-		root->is_used = 0;
-		end_ptr = freeroot;
-#endif
-		freeroot = root;
-	}
 
-	cur = freeroot;
+	cur = arena->freeroot;
 	while(cur && fl_size(cur) != BAD_SIZE && fl_size(cur) < b)
 		cur = cur->nextfree;
 	if(!cur || fl_size(cur) == BAD_SIZE) {
 #ifdef MEM_DEBUG
-		fprintf(stderr, "malloc: out of memory, cur = %p next = %p.\n", cur, cur ? fl_next(cur) : -1);
+		fprintf(stderr, "malloc: out of memory, cur = %p next = %p.\n", cur, cur ? fl_next(cur) : ((void *) -1));
 #endif
 		return NULL;
 	}
 
-	area = ((char *) cur) + sizeof(struct freelist);
+	area = (void *)(cur + 1);
 	old = fl_size(cur);
 	if(b + sizeof(struct freelist) < fl_size(cur)) {
 		next = (struct freelist *)(((char *) cur) + sizeof(struct freelist) + b);
@@ -141,28 +132,95 @@ void *malloc(size_t b) {
 		if(nf)
 			nf->prevfree = cur->prevfree;
 	} else {
-		freeroot = nf;
+		arena->freeroot = nf;
 		if(nf)
 			nf->prevfree = NULL;
 	}
 	/* Force freelist errors to scream -- cur should NOT be in the list anymore */
 	cur->nextfree = NULL;
 	cur->prevfree = NULL;
+	cur->arena = arena;
 	fl_set_used(cur);
 
 #ifdef MEM_DEBUG
-	fprintf(stderr, "malloc: gave %p of %p bytes from %p sz %p, next is %p (%s) (%p away) with %p, nextfree is %p with %p, fr is %p sz %p\n", area, b, cur, old, next, split ? "split" : "not split", ((char *) next) - ((char *) cur), fl_size(next), nf, fl_size(nf), freeroot, fl_size(freeroot));
-	mem_sanity();
+	fprintf(stderr, "malloc: gave %p of %p bytes from arena %p root %p sz %p, next is %p (%s) (%p away) with %p, nextfree is %p with %p, fr is %p sz %p\n", area, b, arena, cur, old, next, split ? "split" : "not split", ((char *) next) - ((char *) cur), fl_size(next), nf, fl_size(nf), arena->freeroot, fl_size(arena->freeroot));
+	mem_sanity(arena);
 #endif
 
 	return area;
 }
 
+void *malloc(size_t b) {
+	struct arena *arena = alist;
+	void *area = NULL;
+
+	while(arena) {
+		if(b > arena->size) continue;
+		area = malloc_in_arena(arena, b);
+		if(area) return area;
+		arena = arena->next;
+	}
+
+	if(!arena) {
+		size_t s;
+		void *root;
+		arch_new_heap(b + MIN_HEADER_SIZE, &root, &s);
+		if(!root) {
+#ifdef MEM_DEBUG
+			fprintf(stderr, "malloc: out of heaps!\n");
+#endif
+			return NULL;
+		}
+		if(s < MIN_HEADER_SIZE) {
+#ifdef MEM_DEBUG
+			fprintf(stderr, "malloc: heap too small to alloc!\n");
+#endif
+			arch_release_heap(root, s);
+			return NULL;
+		}
+#if defined(MEM_DEBUG) || defined(MEM_DEBUG_ARENAS)
+		fprintf(stderr, "malloc: init heap at %p size %p\n", root, s);
+#endif
+		arena = root;
+		arena->size = s;
+		arena->freeroot = (struct freelist *)(((char *) root) + s - sizeof(struct freelist));
+		arena->freeroot->next = NULL;
+		arena->freeroot->nextfree = NULL;
+		arena->freeroot->prevfree = NULL;
+		arena->root = (struct freelist *)(arena + 1);
+		arena->root->next = arena->root->nextfree = arena->freeroot;
+		arena->root->prevfree = NULL;
+#ifdef MEM_DEBUG
+		arena->freeroot->is_used = 0;
+		arena->root->is_used = 0;
+		arena->sentinel = arena->freeroot;
+#endif
+		arena->freeroot = arena->root;
+		arena->next = alist;
+		alist = arena;
+#ifdef MEM_DEBUG
+		fprintf(stderr, "malloc: new arena %p root %p freeroot %p size %p next %p sentinel %p\n", arena, arena->root, arena->freeroot, arena->size, arena->next, arena->sentinel);
+#endif
+	}
+	area = malloc_in_arena(arena, b);
+#ifdef MEM_DEBUG
+	if(!area) {
+		fprintf(stderr, "malloc: newly allocated heap %p size %p cannot satisfy request for %p bytes, aborting\n", arena->root, arena->size, b);
+	}
+#endif
+	return area;
+}
+
 void free(void *area) {
-	struct freelist *fl = (struct freelist *)(((char *) area) - sizeof(struct freelist));
+	struct freelist *fl = ((struct freelist *) area) - 1;
 	size_t i = 1;
 
 	if(!area) return;
+
+#ifdef MEM_DEBUG
+	fprintf(stderr, "free: going to release %p at %p\n", area, fl); // Get this out first
+	fprintf(stderr, "free: ... size %p, %s, arena %p, next %p, nf %p, pf %p\n", fl_size(fl), fl_used(fl) ? "used" : "NOT USED", fl->arena, fl_next(fl), fl->nextfree, fl->prevfree);
+#endif
 
 	fl_set_unused(fl);
 	while(fl_next(fl) && fl_next(fl_next(fl)) && !fl_used(fl_next(fl))) {
@@ -173,7 +231,7 @@ void free(void *area) {
 		if(pf)
 			pf->nextfree = nf;
 		else
-			freeroot = nf;
+			fl->arena->freeroot = nf;
 		if(nf)
 			nf->prevfree = pf;
 		/* And coalesce the area */
@@ -181,14 +239,14 @@ void free(void *area) {
 		i++;
 	}
 
-	fl->nextfree = freeroot;
+	fl->nextfree = fl->arena->freeroot;
 	fl->prevfree = NULL;
-	freeroot->prevfree = fl;
-	freeroot = fl;
+	fl->arena->freeroot->prevfree = fl;
+	fl->arena->freeroot = fl;
 
 #ifdef MEM_DEBUG
-	fprintf(stderr, "free: freed %p releasing %p bytes in %p blocks, fr now %p sz %p, nextfree %p sz %p\n", area, fl_size(fl), i, freeroot, fl_size(freeroot), freeroot->nextfree, fl_size(freeroot->nextfree));
-	mem_sanity();
+	fprintf(stderr, "free: freed %p releasing %p bytes in %p blocks to arena %p, fr now %p sz %p, nextfree %p sz %p\n", area, fl_size(fl), i, fl->arena, fl->arena->freeroot, fl_size(fl->arena->freeroot), fl->arena->freeroot->nextfree, fl_size(fl->arena->freeroot->nextfree));
+	mem_sanity(fl->arena);
 #endif
 }
 
