@@ -376,6 +376,13 @@ struct tl_interp_s {
 	 * allocated objects, to scan the entire set of allocations.
 	 */
 	tl_object *top_alloc;
+	/** The "current continuation"
+	 *
+	 * This is the continuation popped of the continuation stack (see below).
+	 * It lives here mostly so debugging tools can investigate which call
+	 * actually caused an error.
+	 */
+	tl_object *current;
 	/** The "continuation stack".
 	 *
 	 * This is most directly accessed via `tl_push_apply` for pushes, and

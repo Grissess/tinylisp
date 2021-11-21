@@ -38,14 +38,15 @@ size_t fwrite(const void *p, size_t s, size_t n, FILE *f) {
 
 #define VXP_NAME vsnprintf
 #define VXP_ARGS char *s, size_t sz,
+/* Don't return early on fill; we're depending on an accurate cnt
+ * Also beware the careful unsigned comparison when sz == 0
+ */
 #define VXP_PUTC(c) do {\
-	if(cnt >= sz - 1) {\
-		s[cnt] = 0;\
-		return cnt;\
-	}\
-	s[cnt] = (c);\
+	if(cnt + 1 >= sz) {\
+		if(sz && s) s[cnt] = 0;\
+	} else if(s) s[cnt] = (c);\
 } while(0)
-#define VXP_DONE s[cnt] = 0
+#define VXP_DONE if(s && sz && cnt < sz) s[cnt] = 0
 #include "vxprintf_impl.c"
 
 #define VXP_NAME vfprintf

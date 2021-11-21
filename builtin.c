@@ -61,7 +61,7 @@ TL_CF(lambda, "lambda") {
 }
 
 static void _tl_cf_define_k(tl_interp *in, tl_object *result, tl_object *key) {
-	tl_env_set_local(in, in->env, key, tl_first(result));
+	in->env = tl_env_set_local(in, in->env, key, tl_first(result));
 	tl_cfunc_return(in, in->true_);
 }
 
@@ -116,7 +116,10 @@ TL_CFBV(evalin, "eval-in&") {
 	tl_object *k = tl_first(tl_next(tl_next(args)));
 	tl_push_apply(in, 1, k, in->env);
 	tl_push_eval(in, expr, env);
-	tl_cfunc_return(in, in->true_);  /* Stack discipline requires this */
+	/* DON'T return here--it will offset the stack.
+	 * (I thought I understood my code better, but I don't. Consider this free
+	 * advice, even thouh I can't explain why.)
+	 */
 }
 
 TL_CFBV(call_with_current_continuation, "call-with-current-continuation") {
@@ -162,7 +165,7 @@ TL_CF(if, "if") {
 }
 
 static void _tl_cf_set_k(tl_interp *in, tl_object *result, tl_object *key) {
-	tl_env_set_global(in, in->env, key, tl_first(result));
+	in->env = tl_env_set_global(in, in->env, key, tl_first(result));
 	tl_cfunc_return(in, in->true_);
 }
 
@@ -207,8 +210,25 @@ TL_CFBV(concat, "concat") {
 	char *buffer, *end, *src;
 	size_t sz = 0, rsz;
 	for(tl_list_iter(args, val)) {
-		verify_type(in, val, sym, "concat");
-		sz += val->nm->here.len;
+		if(tl_is_int(val)) {
+			char *buf;
+			int sz;
+			tl_object *sm;
+
+			sz = snprintf(NULL, 0, "%ld", val->ival);
+			assert(sz > 0);
+			buf = tl_alloc_malloc(in, sz + 1);
+			assert(buf);
+			snprintf(buf, sz + 1, "%ld", val->ival);
+			val = tl_new_sym(in, buf);
+			l_val->first = val;
+		}
+		if(tl_is_sym(val)) {
+			sz += val->nm->here.len;
+		} else {
+			tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "concat on non-sym or int"), val));
+			tl_cfunc_return(in, in->false_);
+		}
 	}
 	rsz = sz;
 	end = buffer = tl_alloc_malloc(in, sz);
@@ -250,6 +270,52 @@ TL_CFBV(chr, "chr") {
 	verify_type(in, tl_first(args), int, "chr");
 	s[0] = (char) tl_first(args)->ival;
 	tl_cfunc_return(in, tl_new_sym(in, s));
+}
+
+TL_CFBV(substr, "substr") {
+	tl_object *sym, *start;
+	long sidx, eidx;
+	char *buf;
+
+	arity_n(in, args, 2, "substr");
+	sym = tl_first(args);
+	verify_type(in, sym, sym, "substr");
+	start = tl_first(tl_next(args));
+	verify_type(in, start, int, "substr");
+	sidx = start->ival;
+	if(tl_next(tl_next(args))) {
+		start = tl_first(tl_next(tl_next(args)));
+		verify_type(in, start, int, "substr");
+		eidx = start->ival;
+	} else {
+		eidx = sym->nm->here.len;
+	}
+	if(sidx < 0) {
+		sidx += sym->nm->here.len;
+		if(sidx < 0) {
+			sidx = 0;
+		}
+	}
+	if(eidx < 0) {
+		eidx += sym->nm->here.len;
+		if(eidx < 0) {
+			eidx = 0;
+		}
+	}
+	/* Only test these after testing for negatives; otherwise the integer
+	 * promotion makes these unsigned comparisons, always true if the long is
+	 * negative.
+	 */
+	if(sidx >= sym->nm->here.len) {
+		sidx = sym->nm->here.len - 1;
+	}
+	if(eidx > sym->nm->here.len) {
+		eidx = sym->nm->here.len;
+	}
+	if(sidx >= eidx) {
+		sidx = eidx;
+	}
+	tl_cfunc_return(in, tl_new_sym_data(in, sym->nm->here.data + sidx, eidx - sidx));
 }
 
 TL_CFBV(readc, "readc") {

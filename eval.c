@@ -125,6 +125,7 @@ int tl_apply_next(tl_interp *in) {
 		tl_error_clear(in);
 		return 1;
 	}
+	in->current = cont;
 	if(!cont) return 0;
 	in->conts = tl_next(in->conts);
 	assert(tl_is_int(tl_first(cont)));

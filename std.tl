@@ -44,6 +44,9 @@
 (define quote
   (macro (lit) environ lit))
 
+(tl-prefix "~" tl-negate)
+(define tl-negate (lambda (x) (- 0 x)))
+
 ; Continuation compatibility
 (define tl-eval-in
   (lambda (env ex)
@@ -59,6 +62,14 @@
 	(if (null? l)
 	  '()
 	  (cons (f (car l)) (map f (cdr l))))))
+
+(define filter
+  (lambda (f l)
+	(if (null? l)
+	  '()
+	  (if (f (car l))
+		(cons (car l) (filter f (cdr l)))
+		(filter f (cdr l))))))
 
 (define for-each
   (lambda (f l)
@@ -128,6 +139,10 @@
   (lambda (v)
 	(= (type v) 'pair)))
 
+(define procedure?
+  (lambda (v)
+	(or (= (type v) 'func) (= (type v) 'macro))))
+
 (define append
   (lambda (pref suff)
 	(if (null? pref) suff
@@ -166,117 +181,36 @@
   (macro (expr) environ
 		 (tl-eval-in& environ expr (lambda (ex) (tl-eval-in environ ex)))))
 
-(define caar
-  (lambda (l)
-	(car (car l))))
+(define tl-permute-inner
+  (lambda (choices f pfx)
+	(if (null? choices)
+	  (f pfx)
+	  (for-each
+		(lambda (e) (tl-permute-inner (cdr choices) f (cons e pfx)))
+		(car choices)))))
+(define tl-permute (lambda (choices f) (tl-permute-inner choices f '())))
 
-(define cadr
-  (lambda (l)
-	(car (cdr l))))
-
-(define cdar
-  (lambda (l)
-	(cdr (car l))))
-
-(define cddr
-  (lambda (l)
-	(cdr (cdr l))))
-
-(define caaar
-  (lambda (l)
-	(car (car (car l)))))
-
-(define caadr
-  (lambda (l)
-	(car (car (cdr l)))))
-
-(define cadar
-  (lambda (l)
-	(car (cdr (car l)))))
-
-(define caddr
-  (lambda (l)
-	(car (cdr (cdr l)))))
-
-(define cdaar
-  (lambda (l)
-	(cdr (car (car l)))))
-
-(define cdadr
-  (lambda (l)
-	(cdr (car (cdr l)))))
-
-(define cddar
-  (lambda (l)
-	(cdr (cdr (car l)))))
-
-(define cdddr
-  (lambda (l)
-	(cdr (cdr (cdr l)))))
-
-(define caaaar
-  (lambda (l)
-	(car (car (car (car l))))))
-
-(define caaadr
-  (lambda (l)
-	(car (car (car (cdr l))))))
-
-(define caadar
-  (lambda (l)
-	(car (car (cdr (car l))))))
-
-(define caaddr
-  (lambda (l)
-	(car (car (cdr (cdr l))))))
-
-(define cadaar
-  (lambda (l)
-	(car (cdr (car (car l))))))
-
-(define cadadr
-  (lambda (l)
-	(car (cdr (car (cdr l))))))
-
-(define caddar
-  (lambda (l)
-	(car (cdr (cdr (car l))))))
-
-(define cadddr
-  (lambda (l)
-	(car (cdr (cdr (cdr l))))))
-
-(define cdaaar
-  (lambda (l)
-	(cdr (car (car (car l))))))
-
-(define cdaadr
-  (lambda (l)
-	(cdr (car (car (cdr l))))))
-
-(define cdadar
-  (lambda (l)
-	(cdr (car (cdr (car l))))))
-
-(define cdaddr
-  (lambda (l)
-	(cdr (car (cdr (cdr l))))))
-
-(define cddaar
-  (lambda (l)
-	(cdr (cdr (car (car l))))))
-
-(define cddadr
-  (lambda (l)
-	(cdr (cdr (car (cdr l))))))
-
-(define cdddar
-  (lambda (l)
-	(cdr (cdr (cdr (car l))))))
-
-(define cddddr
-  (lambda (l)
-	(cdr (cdr (cdr (cdr l))))))
+(define tl-path-get
+  (lambda (l path)
+	(cond
+	  ((null? path) l)
+	  ((= (car path) 'a) (tl-path-get (car l) (cdr path)))
+	  ((= (car path) 'd) (tl-path-get (cdr l) (cdr path)))
+	  ((= (car path) 'i) (tl-path-get l (cdr path))))))
+(define tl-make-path
+  (lambda (var path)
+	(cond
+	  ((null? path) var)
+	  ((= (car path) 'a) (cons 'car (cons (tl-make-path var (cdr path)) '())))
+	  ((= (car path) 'd) (cons 'cdr (cons (tl-make-path var (cdr path)) '())))
+	  ((= (car path) 'i) (tl-make-path var (cdr path))))))
+(define tl-make-cxr
+  (lambda (perm)
+	(let* (
+		   (conc (apply tl-concat (filter (lambda (x) (not (= x 'i))) perm)))
+		   (sym (tl-concat 'c conc 'r))
+		   )
+	  (eval `(set! ,sym (lambda (l) ,(tl-make-path 'l perm)))))))
 
 ; Language essentials
 
@@ -304,12 +238,12 @@
 							   `(begin @body)
 							   `(let (,(car bindings)) (let* ,(cdr bindings) @body))))))
 
-;(define let*
-;  (macro (bindings body)
-;		 (if (null? bindings)
-;		   (cons 'begin body)
-;		   (cons (car bindings) (cons (cdr bindings) '())))))
-
+; Need these four for bootstrapping
+(define caar (lambda (l) (car (car l))))
+(define cdar (lambda (l) (cdr (car l))))
+(define cadr (lambda (l) (car (cdr l))))
+(define cadar (lambda (l) (car (cdr (car l)))))
+(tl-permute '((a d) (a d) (a d i) (a d i)) tl-make-cxr)
 
 ; List manipulation
 
@@ -340,19 +274,27 @@
 
 ; Associative list manipulation
 
-(define assoc
-  (lambda (k a)
+(define assocp
+  (lambda (pred a)
 	(cond
 	  ((null? a) #f)
-	  ((= k (caar a)) (car a))
-	  (else (assoc k (cdr a))))))
+	  ((pred (caar a)) (car a))
+	  (else (assocp pred (cdr a))))))
+
+(define del-assocp
+  (lambda (pred a)
+	(cond
+	  ((null? a) '())
+	  ((pred (caar a)) (del-assocp pred (cdr a)))
+	  (else (cons (car a) (del-assocp pred (cdr a)))))))
+
+(define assoc
+  (lambda (k a)
+	(assocp (lambda (x) (= k x)) a)))
 
 (define del-assoc
   (lambda (k a)
-	(cond
-	  ((null? a) '())
-	  ((= k (caar a)) (del-assoc k (cdr a)))
-	  (else (cons (car a) (del-assoc k (cdr a)))))))
+	(del-assocp (lambda (x) (= k x)) a)))
 
 ; loop/recur
 

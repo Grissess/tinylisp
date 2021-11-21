@@ -61,6 +61,7 @@ void tl_interp_init_alloc(tl_interp *in, void *(*reallocf)(tl_interp *, void *, 
 	in->false_ = tl_new_sym(in, "tl-#f");
 	in->error = NULL;
 	in->prefixes = TL_EMPTY_LIST;
+	in->current = TL_EMPTY_LIST;
 	in->conts = TL_EMPTY_LIST;
 	in->values = TL_EMPTY_LIST;
 	in->rescue = TL_EMPTY_LIST;

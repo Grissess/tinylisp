@@ -25,7 +25,11 @@ tl_object *tl_env_set_global(tl_interp *in, tl_object *env, tl_object *nm, tl_ob
 	if(!env) {
 		env = tl_new_pair(in, TL_EMPTY_LIST, env);
 	}
-	env->first = tl_new_pair(in, tl_new_pair(in, nm, val), env->first);
+	for(tl_list_iter(env, frame)) {
+		if(!tl_next(l_frame)) {
+			l_frame->first = tl_frm_set(in, frame, nm, val);
+		}
+	}
 	return env;
 }
 

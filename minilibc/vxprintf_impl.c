@@ -50,6 +50,7 @@ int VXP_NAME(VXP_ARGS const char *fmt, va_list ap) {
 
 				case 'd':
 					temp.lint = (long)va_arg(ap, int);
+					fmt--;  /* jump to ld assumes *fmt == 'l' */
 					goto decimal;
 
 				case 'l':  /* XXX d */
@@ -66,7 +67,7 @@ decimal:
 						VXP_PUTC("0123456789"[temp.lint / i % 10]);
 						cnt++;
 						i /= 10;
-					} while(i > 1 || i < -1);
+					} while(i);
 					fmt += 2;  /* skip over presupposed d*/
 					break;
 

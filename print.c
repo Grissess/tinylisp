@@ -64,6 +64,11 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 		case TL_CFUNC_BYVAL:
 		case TL_THEN:
 			tl_printf(in, "%s:%p", obj->name ? obj->name : (obj->kind == TL_CFUNC ? "<cfunc>" : (obj->kind == TL_CFUNC_BYVAL ? "<cfunc_byval>" : "<then>")), obj->cfunc);
+			/*if(obj->state) {
+				tl_printf(in, ":(");
+				tl_print(in, obj->state);
+				tl_printf(in, ")");
+			}*/
 			break;
 
 		case TL_MACRO:

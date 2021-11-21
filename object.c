@@ -256,6 +256,7 @@ void tl_gc(tl_interp *in) {
 	_tl_mark_pass(in->prefixes);
 	_tl_mark_pass(in->env);
 	_tl_mark_pass(in->top_env);
+	_tl_mark_pass(in->current);
 	_tl_mark_pass(in->conts);
 	_tl_mark_pass(in->values);
 	obj = in->top_alloc;

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef UNIX
 #include <unistd.h>
@@ -87,6 +88,73 @@ TL_CFBV(exit, "exit") {
 	exit(tl_first(args)->ival);
 }
 
+void _print_cont_stack(tl_interp *in, tl_object *stack, int level);
+
+void _print_cont(tl_interp *in, tl_object *cont, int level) {
+	tl_object *len, *callex;
+	fprintf(stderr, "Len ");
+	len = tl_first(cont);
+	tl_print(in, len);
+	fflush(stdout);
+	if(tl_is_int(len) && len->ival < 0) {
+		switch(len->ival) {
+			case TL_APPLY_PUSH_EVAL: fprintf(stderr, " (TL_APPLY_PUSH_EVAL)"); break;
+			case TL_APPLY_INDIRECT: fprintf(stderr, " (TL_APPLY_INDIRECT)"); break;
+			case TL_APPLY_DROP_EVAL: fprintf(stderr, " (TL_APPLY_DROP_EVAL)"); break;
+			case TL_APPLY_DROP: fprintf(stderr, " (TL_APPLY_DROP)"); break;
+			case TL_APPLY_DROP_RESCUE: fprintf(stderr, " (TL_APPLY_DROP_RESCUE)"); break;
+		}
+	}
+	fprintf(stderr, " Callex ");
+	callex = tl_first(tl_next(cont));
+	tl_print(in, callex);
+	fflush(stdout);
+	if(tl_is_then(callex) && callex->state) {
+		/* I'd like to see where this is proven wrong */
+		fprintf(stderr, " Returns to ");
+		_print_cont(in, callex->state, level + 1);
+	}
+	if(tl_is_cont(callex) && !tl_is_marked(callex)) {
+		tl_mark(callex);
+		fprintf(stderr, ":");
+		_print_cont_stack(in, callex->ret_conts, level + 1);
+	}
+}
+
+void _print_cont_stack(tl_interp *in, tl_object *stack, int level) {
+	int i;
+	for(tl_list_iter(in->conts, cont)) {
+		fprintf(stderr, "\n");
+		for(i = 0; i < level; i++) fprintf(stderr, "  ");
+		fprintf(stderr, "Stack");
+		if(l_cont == in->conts) {
+			fprintf(stderr, "(Top)");
+		}
+		if(!tl_next(l_cont)) {
+			fprintf(stderr, "(Bottom)");
+		}
+		fprintf(stderr, ": ");
+		_print_cont(in, cont, level);
+	}
+}
+
+void print_cont_stack(tl_interp *in, tl_object *stack) {
+	/* Borrow the GC marker, with care; as long as we don't run user code here,
+	 * the GC won't run anyway, and we're being careful not to alloc new
+	 * objects.
+	 */
+	tl_object *obj = in->top_alloc;
+	while(obj) {
+		tl_unmark(obj);
+		obj = tl_next_alloc(obj);
+	}
+
+	fprintf(stderr, "\nCurrent: ");
+	_print_cont(in, in->current, 0);
+	_print_cont_stack(in, stack, 0);
+}
+
+
 #ifdef CONFIG_MODULES_BUILTIN
 extern void *__start_tl_bmcons;
 extern void *__stop_tl_bmcons;
@@ -144,6 +212,7 @@ int main() {
 			fflush(stdout);
 			tl_prompt("\n");
 		}
+		in.current = TL_EMPTY_LIST;
 		tl_eval_and_then(&in, expr, NULL, _main_k);
 		tl_run_until_done(&in);
 		if(in.error) {
@@ -151,6 +220,22 @@ int main() {
 			fprintf(stderr, "Error: ");
 			tl_print(&in, in.error);
 			fflush(stdout);
+			print_cont_stack(&in, in.conts);
+			fprintf(stderr, "\nValues: ");
+			tl_print(&in, in.values);
+			fflush(stdout);
+			for(tl_list_iter(in.env, frm)) {
+				fprintf(stderr, "\nFrame");
+				if(!tl_next(l_frm)) {
+					fprintf(stderr, "(Outer)");
+				}
+				if(l_frm == in.env) {
+					fprintf(stderr, "(Inner)");
+				}
+				fprintf(stderr, ": ");
+				tl_print(&in, frm);
+				fflush(stdout);
+			}
 			fprintf(stderr, "\n");
 			tl_error_clear(&in);
 		}
