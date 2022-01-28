@@ -227,7 +227,7 @@ void free(void *area) {
 		/* Unlink from freelist */
 		struct freelist *pf = fl_next(fl)->prevfree, *nf = fl_next(fl)->nextfree;
 		if(!(pf || nf))
-			fprintf(stderr, "free: WARN: found entry %p sz %p from %p sz %p that has double NULL freelist pointers\n", fl_next(fl), fl_size(fl_next(fl)), fl, fl_size(fl));
+			fprintf(stderr, "free: WARN: found entry %p sz %p from %p sz %p that has double NULL freelist pointers\n", fl_next(fl), (void*)fl_size(fl_next(fl)), fl, (void*)fl_size(fl));
 		if(pf)
 			pf->nextfree = nf;
 		else

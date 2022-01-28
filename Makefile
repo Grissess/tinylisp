@@ -8,18 +8,22 @@ DESTDIR ?= /usr/local/
 CC ?= gcc
 PLAT ?= UNIX  # TODO: figure this out somehow
 V ?= 1
+INTERPRETER ?= tl
 
 define newline
 
 
+endef
+define tab
+	
 endef
 
 define help_text
 Type 'make' (or make -jN, for N parallel jobs) to make TinyLISP.
 
 Targets (pass ONE of these to make):
-	tl: the TinyLISP executable.
-	all: equivalent to tl.
+	all: The TinyLISP interpreter (or output library).
+	$(INTERPRETER): the current output file.
 	dist: the tinylisp.tar.xz source tarball.
 	clean: remove tl and all build intermediates.
 	install: install tl to DESTDIR
@@ -53,6 +57,12 @@ Influential variables (and their current values):
 		If nonempty, use Minilibc (a minimal C library)
 		and build tl statically. (This also affects
 		modules, see below.)
+
+	MINILIBC_ARCH = $(MINILIBC_ARCH)
+		The architecture backend used by minilibc to
+		interact with the world. Valid values are {
+		$(basename $(notdir $(wildcard minilibc/arch/*.c)))
+		}; the default is 'linsys'.
 
 	MODULES = $(MODULES)
 		Modules to build. These will be built as shared
@@ -88,10 +98,21 @@ ifeq ($(MODULES),all)
 endif
 
 ifneq ($(USE_MINILIBC),)
-	CFLAGS += -Iminilibc -nostdlib -nostartfiles -static
+	CFLAGS += -Iminilibc -nostdlib -static
 	OBJ += $(patsubst %,minilibc/%.o,string stdio assert stdlib ctype unistd)
 	MINILIBC_ARCH ?= linsys
-	OBJ += minilibc/arch/$(MINILIBC_ARCH).o
+	MINILIBC_MK := minilibc/arch/$(MINILIBC_ARCH).mk
+ifeq ($(V),0)
+	# Nothing at all
+else ifeq ($(V),1)
+$(info $(tab)INCL$(tab)$(MINILIBC_MK))
+else
+$(info $(tab)-include $(MINILIBC_MK))
+endif
+-include $(MINILIBC_MK)
+	MINILIBC_OBJ := minilibc/arch/$(MINILIBC_ARCH).o
+	OBJ += $(MINILIBC_OBJ)
+$(MINILIBC_OBJ): CFLAGS += -I.
 	MODULES_BUILTIN := $(MODULES)
 	MODULES :=
 endif
@@ -136,7 +157,7 @@ endif
 .PRECIOUS: $(INITSCRIPTS)
 .SUFFIXES:
 
-all: tl $(LIB)
+all: $(INTERPRETER) $(LIB)
 
 define cmd_showconfig
 	echo "OBJ = $(OBJ)"
@@ -152,9 +173,9 @@ showconfig:
 help:
 	@printf "$(subst $(newline),\n,$(help_text))\n"
 
-cmd_run = cat std.tl - | $(DEBUGGER) ./tl
+cmd_run = cat std.tl - | $(DEBUGGER) ./$(INTERPRETER)
 quiet_run = RUN
-run: tl 
+run: $(INTERPRETER)
 	$(call cmd,run)
 
 dist: tinylisp.tar.xz
@@ -183,7 +204,7 @@ quiet_tinylisp_tar = TAR\t$@
 tinylisp.tar: $(SRC) std.tl test.tl Makefile
 	$(call cmd,tinylisp_tar)
 
-cmd_clean = rm $(OBJ) tl
+cmd_clean = rm $(OBJ) $(INTERPRETER)
 quiet_client = CLEAN
 clean:
 	$(call cmd,clean)
@@ -195,7 +216,7 @@ install: tl
 
 cmd_tl = $(CC) $(CFLAGS) $^ $(LDFLAGS) -o $@
 quiet_tl = LD\t$@
-tl: $(OBJ)
+$(INTERPRETER): $(OBJ)
 	$(call cmd,tl)
 
 cmd_so = $(CC) -shared -o $@ $(CFLAGS) $< $(LDFLAGS)

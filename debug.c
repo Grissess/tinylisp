@@ -54,7 +54,8 @@ void tl_dbg_print(tl_object *obj, int level) {
 			tl_dbg_print(obj->args, level + 2);
 			if(obj->kind == TL_MACRO) {
 				_indent(level + 1);
-				fprintf(stderr, "envn: %s\n", obj->envn);
+				fprintf(stderr, "envn:\n");
+				tl_dbg_print(obj->envn, level + 2);
 			}
 			_indent(level + 1);
 			fprintf(stderr, "body:\n");

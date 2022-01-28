@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>TinyLISP</title>
+<script type="text/javascript">
+var output = null;
+var stdin = "", stdout = "";
+var mod, inst;
+
+function print(x) {
+		stdout += x;
+		if(stdout.indexOf("\n") != -1) {
+				console.log(stdout);
+				if(output != null) output.textContent += stdout;
+				stdout = "";
+		}
+}
+
+var STDIN = 0, STDOUT = 1, STDERR = 2, EOF = -1, PAGE = 65536, PTR = 4;
+var watermark = null, interp= null, expr = null, pm_name = null;
+var running = true;
+function PGOF(x) { return Math.floor(x / PAGE); }
+var PM_NAME = "PRIME_MOVER";
+var ENC = new TextEncoder(), DEC = new TextDecoder();
+
+function mainloop() {
+		// Set aside a tl_interp on the heap
+		watermark = inst.exports['__heap_base'].value
+		// As of this writing, sizeof(tl_interp) == 256
+		// TODO: find a way to export this information
+		interp = watermark; watermark += 256;
+		expr = watermark; watermark += PTR;
+		pm_name = watermark;
+		var mem = inst.exports['memory'];
+		var u8a = new Uint8Array(mem, pm_name);
+		var res = ENC.encodeInto(PM_NAME, u8a);
+		u8a[res.written] = 0;
+		watermark += res.written + 1;
+		print("Interp at " + interp + ", expr at " + expr + ", pm_name at " + pm_name + " len " + res.written + " value " + DEC.decode(new Uint8Array(mem, pm_name, res.written)) + "\n");
+		// Align the watermark
+		if(watermark&7 != 0) watermark += (8 - 7&watermark);
+		var pw = PGOF(watermark), pgs = PGOF(mem.buffer.byteLength);
+		if(pw > pgs) { mem.grow(pw - pgs); }
+		// Find the prime mover
+		var _main_k = inst.exports._main_k;
+		var _main_k_ref = null;
+		var tbl = inst.exports.__indirect_function_table;
+		for(var i = 0; i < tbl.length; i++) {
+				if(tbl.get(i) === _main_k) {
+						_main_k_ref = i;
+						break;
+				}
+		}
+		if(_main_k_ref == null) {
+				print("Couldn't find prime mover! Refusing to start.");
+				return;
+		}
+		print("Prime mover: " + _main_k_ref + "\n");
+		// The rest of this code mirrors tl's ordinary main()
+		inst.exports.tl_interp_init(interp);
+		while(running) {
+				inst.exports.tl_wasm_clear_state(interp);
+				print("> ");
+				expr = inst.exports.tl_read(interp, 0);
+				if(expr == 0) {
+						print("(End of program.)\n");
+						break;
+				}
+				inst.exports._tl_eval_and_then(interp, expr, 0, _main_k_ref, pm_name);
+				while(inst.exports.tl_apply_next(interp)) ;
+				var error = inst.exports.tl_wasm_get_error(interp);
+				if(error != 0) {
+						print("Error: ");
+						inst.exports.tl_print(interp, error);
+						print("\n");
+				}
+		}
+		print("Program exited.\n");
+}
+
+var imports = {
+		tl: {
+				fflush: function(fd) {},
+				fputc: function(fd, c) {
+						print(String.fromCharCode(c));
+				},
+				fgetc: function(fd) {
+						var c = EOF;
+						while(stdin.length == 0) {
+								var input = prompt("stdin:");
+								if(input == null) return EOF;
+								input += "\n";
+								print(input);
+								stdin += input;
+						}
+						c = stdin.charCodeAt(0);
+						stdin = stdin.substr(1);
+						return c;
+				},
+				halt: function(code) {
+						print("\nProcess exited with code " + code);
+						running = false;
+						// This isn't supposed to return, but the best we can
+						// do is promise not to call any other APIs
+				},
+				new_heap: function(min, whereptr, szptr) {
+						print("new_heap @" + whereptr + " sz@" + szptr + "\n");
+						var amt = Math.max(min, 32*PAGE);
+						if(watermark == null) {
+								watermark = inst.exports['__heap_base'].value;
+						}
+						var where = watermark;
+						watermark += amt;
+						var mem = inst.exports['memory'];
+						var pgs = PGOF(mem.buffer.byteLength);
+						var maxpg = PGOF(watermark + PAGE - 1);
+						if(maxpg > pgs) {
+								mem.grow(maxpg - pgs);
+								print("memory grown to " + mem.buffer.byteLength + " bytes\n");
+						}
+						var dv = new DataView(mem.buffer);
+						dv.setInt32(whereptr, where, true);
+						dv.setInt32(szptr, amt, true);
+						print("alloc'd " + dv.getInt32(szptr, true) + " bytes at " + dv.getInt32(whereptr, true) + "\n");
+				},
+				release_heap: function(where, sz) {},  // Don't care
+		},
+};
+
+function init() {
+		output = document.querySelector("#output");
+		// Work around issues with the MIME type provided by simple servers
+		fetch("../tl.wasm").then(resp =>
+				resp.arrayBuffer()
+		).then(buf => 
+				WebAssembly.instantiate(
+						buf,
+						imports,
+				)
+		).then(res => {
+				mod = res.module;
+				inst = res.instance;
+				setTimeout(mainloop, 0);
+		}).catch(err => {
+				print("LOADING ERROR: " + err + "\n");
+		});
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+<style type="text/css">
+#output {
+	width: 100%;
+	height: 512px;
+	font-family: monospace;
+	white-space: pre-wrap;
+}
+</style>
+	</head>
+	<body>
+		<div id="output"></div>
+	</body>
+</html>

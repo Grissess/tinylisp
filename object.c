@@ -13,9 +13,11 @@
  * collected if it is not reachable from any root on the next call to `tl_gc`.
  */
 tl_object *tl_new(tl_interp *in) {
+	tl_trace(new_enter, in);
 	tl_object *obj = tl_alloc_malloc(in, sizeof(tl_object));
 	if(!obj) {
 		tl_gc(in);
+		tl_trace(new_retry, in);
 		obj = tl_alloc_malloc(in, sizeof(tl_object));
 		assert(obj);
 	}
@@ -23,6 +25,7 @@ tl_object *tl_new(tl_interp *in) {
 	obj->prev_alloc = NULL;
 	if(in->top_alloc) in->top_alloc->prev_alloc = obj;
 	in->top_alloc = obj;
+	tl_trace(new_exit, in, obj);
 	return obj;
 }
 
@@ -165,6 +168,7 @@ tl_object *tl_new_cont(tl_interp *in, tl_object *env, tl_object *conts, tl_objec
  * use this function (except from within `tl_gc`).
  */
 void tl_free(tl_interp *in, tl_object *obj) {
+	tl_trace(free_enter, in, obj);
 	if(!obj) return;
 	if(obj->prev_alloc) {
 		obj->prev_alloc->next_alloc = tl_make_next_alloc(
@@ -191,6 +195,7 @@ void tl_free(tl_interp *in, tl_object *obj) {
 			break;
 	}
 	tl_alloc_free(in, obj);
+	tl_trace(free_exit, in, obj);
 }
 
 /** Mark an object and its descendents.
@@ -246,10 +251,12 @@ static void _tl_mark_pass(tl_object *obj) {
 void tl_gc(tl_interp *in) {
 	tl_object *obj = in->top_alloc;
 	tl_object *tmp;
+	tl_trace(gc_enter, in);
 	while(obj) {
 		tl_unmark(obj);
 		obj = tl_next_alloc(obj);
 	}
+	tl_trace(gc_mark_enter, in);
 	_tl_mark_pass(in->true_);
 	_tl_mark_pass(in->false_);
 	_tl_mark_pass(in->error);
@@ -259,6 +266,7 @@ void tl_gc(tl_interp *in) {
 	_tl_mark_pass(in->current);
 	_tl_mark_pass(in->conts);
 	_tl_mark_pass(in->values);
+	tl_trace(gc_mark_exit, in);
 	obj = in->top_alloc;
 	while(obj) {
 		tmp = obj;
@@ -267,6 +275,7 @@ void tl_gc(tl_interp *in) {
 			tl_free(in, tmp);
 		}
 	}
+	tl_trace(gc_exit, in);
 }
 
 /** Returns the length of a list.

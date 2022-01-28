@@ -24,7 +24,7 @@ static int _initscript_readf(tl_interp *in) {
 }
 #endif
 
-tl_interp *_global_in;
+tl_interp *_global_in;  /* Here mostly for debugger access */
 
 #ifdef CONFIG_MODULES
 #include <dlfcn.h>

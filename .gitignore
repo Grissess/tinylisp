@@ -1,6 +1,7 @@
 *.o
 *.so
 tl
+tl.*
 ns_test
 a.out
 *.tar.xz

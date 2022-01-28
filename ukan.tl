@@ -5,7 +5,7 @@
 
 (define #var '#var)
 
-(define var (lambda (c) (cons #var c)))  ; (#var . c) also works
+(define var (lambda (c) (cons #var c)))  ; `(#var . ,c) also works
 (define var? (lambda (x) (= (car x) #var)))
 (define var=? (lambda (x y) (= (cdr x) (cdr y))))
 
@@ -18,6 +18,10 @@
 		  (tl-andthen (cdr args) env test)
 		  #f)))))
 (define andthen (macro args env (tl-andthen args env #t)))
+
+; RnRS apparently has null? imply (not pair?)--I haven't evaluated that for the
+; stdlib yet
+(define pair-not-null? (lambda (v) (andthen (pair? v) (not (null? v)))))
 
 (define walk
   (lambda (u s)
@@ -35,15 +39,16 @@
 
 (define unify
   (lambda (u v s)
-	(cond
-	  ((andthen (var? u) (var? v) (var=? u v)) s)
-	  ((var? u) (ext-s u v s))
-	  ((var? v) (ext-s v u s))
-	  ; NB: pair? implies var? but we've exhausted the permutations above
-	  ((and (pair? u) (pair? v))
-	   (let ((s (unify (car u) (car v) s)))
-		 (andthen s (unify (cdr u) (cdr v) s))))
-	  (else (andthen (= u v) s)))))
+	(let ((u (walk u s)) (v (walk v s)))
+	  (cond
+		((andthen (var? u) (var? v) (var=? u v)) s)
+		((var? u) (ext-s u v s))
+		((var? v) (ext-s v u s))
+		; NB: pair? implies var? but we've exhausted the permutations above
+		((and (pair-not-null? u) (pair-not-null? v))
+		 (let ((s (unify (car u) (car v) s)))
+		   (andthen s (unify (cdr u) (cdr v) s))))
+		(else (andthen (= u v) s))))))
 
 (define call/fresh
   (lambda (f)
@@ -74,15 +79,15 @@
   (macro (g) env
 		 (tl-eval-in env `(lambda (s/c) (lambda () (,g s/c))))))
 (define conj+
-  (macro args env
-		 (if (null? (cdr args))
-		   (tl-eval-in env (car args))
-		   (tl-eval-in env `(conj (Zzz ,(car args)) (conj+ @(cdr args)))))))
+  (macro (first . rest) env
+		 (if (null? rest)
+		   (tl-eval-in env `(Zzz ,first))
+		   (tl-eval-in env `(conj (Zzz ,first) (conj+ @rest))))))
 (define disj+
-  (macro args env
-		 (if (null? (cdr args))
-		   (tl-eval-in env (car args))
-		   (tl-eval-in env `(disj (Zzz ,(car args)) (disj+ @(cdr args)))))))
+  (macro (first . rest) env
+		 (if (null? rest)
+		   (tl-eval-in env `(Zzz ,first))
+		   (tl-eval-in env `(disj (Zzz ,first) (disj+ @rest))))))
 (define conde
   (macro args env
 		 (tl-eval-in env `(disj+ @(map (lambda (e) (cons 'conj+ e)) args)))))
@@ -120,7 +125,7 @@
 	  ((var? v)
 	   (let ((n (reify-name (length s))))
 		 (cons (cons v n) s)))
-	  ((pair? v) (reify-s (cdr v) (reify-s (car v) s)))
+	  ((pair-not-null? v) (reify-s (cdr v) (reify-s (car v) s)))
 	  (else s))))
 (define reify-name (lambda (n) (tl-concat '_. n)))
 (define walk*
@@ -128,7 +133,7 @@
 	(let ((v (walk v s)))
 	  (cond
 		((var? v) v)
-		((pair? v) (cons (walk* (car v) s) (walk* (cdr v) s)))
+		((pair-not-null? v) (cons (walk* (car v) s) (walk* (cdr v) s)))
 		(else v)))))
 
 (define empty-state '(() . 0))

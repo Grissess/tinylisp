@@ -15,7 +15,7 @@ int strcmp(const char *a, const char *b) {
 
 char *strcpy(char *dest, const char *src) {
 	char *d = dest;
-	while(*d++ = *src++) ;
+	while((*d++ = *src++)) ;
 	return dest;
 }
 
@@ -42,7 +42,7 @@ int memcmp(const void *c1, const void *c2, size_t n) {
 	size_t i = 0;
 	int diff;
 	while(i < n) {
-		if(diff = (((char *) c1)[i] - ((char *) c2)[i]))
+		if((diff = (((char *) c1)[i] - ((char *) c2)[i])))
 			return diff;
 		i++;
 	}

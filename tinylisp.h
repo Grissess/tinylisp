@@ -30,6 +30,28 @@
 #define TL_EXTERN
 #endif
 
+#ifdef HAVE_SYSTEMTAP
+#define SDT_USE_VARIADIC
+#include <sys/sdt.h>
+#define tl_trace(pt, ...) STAP_PROBEV(tinylisp, pt, __VA_ARGS__)
+#else
+/** Set the named trace point, optionally with parameters
+ *
+ * Probes of this kind are intended to indicate "high level events" that may be
+ * of interest to performance-monitoring tools. The point should indicate the
+ * operation being done; if it bounds a region of time, it is idiomatic to
+ * include a "_enter" and "_exit" point. Points like these should be pushed as
+ * far down the abstraction (if not necessarily the call stack) as reasonable
+ * to improve the accuracy of the instrumentation.
+ *
+ * In default builds, these expand to nothing (at all!). When `HAVE_SYSTEMTAP`
+ * is defined, these compile to `stap` probes that can be instrumented, but by
+ * default introduce very little overhead (they compile to a `nop` before being
+ * instrumented). `HAVE_DTRACE` support is planned, but not yet supported.
+ */
+#define tl_trace(pt, ...)
+#endif
+
 typedef struct tl_interp_s tl_interp;
 typedef struct tl_name_s tl_name;
 
@@ -824,20 +846,18 @@ typedef struct tl_buffer_s {
 	size_t len;
 } tl_buffer;
 
-struct tl_name_s;
-
 typedef struct tl_child_s {
 	tl_buffer seg;
 	struct tl_name_s *name;
 } tl_child;
 
-typedef struct tl_name_s {
+struct tl_name_s {
 	tl_buffer here;
 	size_t num_children;
 	size_t sz_children;
 	tl_child *children;
 	struct tl_name_s *chain;
-} tl_name;
+};
 
 void tl_ns_init(tl_interp *, tl_ns *);
 void tl_ns_free(tl_interp *, tl_ns *);

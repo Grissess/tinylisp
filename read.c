@@ -82,7 +82,7 @@ tl_object *tl_read(tl_interp *in, tl_object *args) {
 
 						case '.':
 							list = tl_new_pair(in, tl_read(in, TL_EMPTY_LIST), list);
-							while(d = tl_getc(in)) {
+							while((d = tl_getc(in))) {
 								if(d != ' ' && d != '\n' && d != '\t' && d != '\v' && d != '\r' && d != 'b') break;
 							}
 
