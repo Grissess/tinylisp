@@ -52,6 +52,7 @@ Influential variables (and their current values):
 		Your platform:
 			UNIX: Something that resembles POSIX.
 			WINDOWS: Something that resembles Windows.
+			WASM: A WASM-bytecode runtime.
  	
 	USE_MINILIBC = $(USE_MINILIBC)
 		If nonempty, use Minilibc (a minimal C library)
