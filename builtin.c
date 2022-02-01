@@ -318,8 +318,13 @@ TL_CFBV(substr, "substr") {
 	tl_cfunc_return(in, tl_new_sym_data(in, sym->nm->here.data + sidx, eidx - sidx));
 }
 
+static void _tl_readc_k(tl_interp *in, tl_object *args, tl_object *state) {
+	/* A bit superfluous, but we need to name this trampoline anyway, so... */
+	tl_cfunc_return(in, tl_first(args));
+}
+
 TL_CFBV(readc, "readc") {
-	tl_cfunc_return(in, tl_new_int(in, tl_getc(in)));
+	tl_getc_and_then(in, TL_EMPTY_LIST, _tl_readc_k);
 }
 
 TL_CFBV(putbackc, "putbackc") {
@@ -463,7 +468,7 @@ TL_CFBV(gc, "gc") {
 }
 
 TL_CFBV(read, "read") {
-	tl_cfunc_return(in, tl_read(in, TL_EMPTY_LIST));
+	tl_read(in);  /* Returns into the same stack */
 }
 
 TL_CFBV(load_mod, "load-mod") {

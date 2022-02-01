@@ -4,23 +4,23 @@
 #include "tinylisp.h"
 
 int tl_push_eval(tl_interp *in, tl_object *expr, tl_object *env) {
-	if(tl_has_error(in)) return 0;
+	if(tl_has_error(in)) return TL_RESULT_DONE;
 	if(!expr) {
 		tl_error_set(in, tl_new_sym(in, "evaluate ()"));
-		return 0;
+		return TL_RESULT_DONE;
 	}
 	if(tl_is_int(expr) || tl_is_callable(expr)) {  /* Self-valuating */
 		tl_values_push(in, expr);
-		return 0;
+		return TL_RESULT_DONE;
 	}
 	if(tl_is_sym(expr)) {  /* Variable binding */
 		tl_object *binding = tl_env_get_kv(in, env, expr);
 		if(!binding) {
 			tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "unknown var"), expr));
-			return 0;
+			return TL_RESULT_DONE;
 		}
 		tl_values_push(in, tl_next(binding));
-		return 0;
+		return TL_RESULT_DONE;
 	}
 	if(tl_is_pair(expr)) {  /* Application */
 		size_t len = tl_list_len(expr);
@@ -31,10 +31,10 @@ int tl_push_eval(tl_interp *in, tl_object *expr, tl_object *env) {
 				tl_values_push_syntactic(in, subex);
 			}
 		}
-		return 1;
+		return TL_RESULT_AGAIN;
 	}
 	tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "unevaluable"), expr));
-	return 0;
+	return TL_RESULT_DONE;
 }
 
 void tl_push_apply(tl_interp *in, long len, tl_object *expr, tl_object *env) {
@@ -109,6 +109,7 @@ int tl_apply_next(tl_interp *in) {
 	tl_object *cont = tl_first(in->conts);
 	long len;
 	tl_object *callex, *env, *args = TL_EMPTY_LIST;
+	int res;
 	/*
 	tl_printf(in, "Conts: ");
 	tl_print(in, in->conts);
@@ -116,17 +117,17 @@ int tl_apply_next(tl_interp *in) {
 	*/
 	if(tl_has_error(in)) {
 		tl_object *rescue = tl_rescue_peek(in);
-		if(!rescue) return 0;
+		if(!rescue) return TL_RESULT_DONE;
 		tl_rescue_drop(in);
 		/* Trampoline into the rescue continuation--we could do this directly,
 		 * but why reinvent the wheel? */
 		tl_push_apply(in, 1, rescue, in->env);
 		tl_values_push(in, in->error);
 		tl_error_clear(in);
-		return 1;
+		return TL_RESULT_AGAIN;
 	}
 	in->current = cont;
-	if(!cont) return 0;
+	if(!cont) return TL_RESULT_DONE;
 	in->conts = tl_next(in->conts);
 	assert(tl_is_int(tl_first(cont)));
 	len = tl_first(cont)->ival;
@@ -139,14 +140,23 @@ int tl_apply_next(tl_interp *in) {
 #endif
 	if(len == TL_APPLY_DROP) {
 		in->values = tl_next(in->values);
-		return 1;
+		return TL_RESULT_AGAIN;
 	}
 	if(len == TL_APPLY_DROP_RESCUE) {
 		tl_rescue_drop(in);
-		return 1;
+		return TL_RESULT_AGAIN;
+	}
+	if(len == TL_APPLY_GETCHAR) {
+		if(in->is_putback) {
+			tl_values_push(in, tl_new_int(in, in->putback));
+			in->is_putback = 0;
+			return TL_RESULT_AGAIN;
+		} else {
+			return TL_RESULT_GETCHAR;
+		}
 	}
 	if(len != TL_APPLY_INDIRECT) {
-		if(tl_push_eval(in, callex, env)) {
+		if((res = tl_push_eval(in, callex, env))) {
 			if(!(len == TL_APPLY_PUSH_EVAL || len == TL_APPLY_DROP_EVAL)) {
 #ifdef CONT_DEBUG
 				tl_printf(in, "[indirected]\n");
@@ -161,7 +171,7 @@ int tl_apply_next(tl_interp *in) {
 				tl_push_apply(in, TL_APPLY_DROP, TL_EMPTY_LIST, TL_EMPTY_LIST);
 				in->conts = tl_new_pair(in, cont, in->conts);
 			}
-			return 1;
+			return res;
 		}
 	} else {
 #ifdef CONT_DEBUG
@@ -188,14 +198,14 @@ int tl_apply_next(tl_interp *in) {
 	}
 	tl_printf(in, "\n");
 #endif
-	if(len == TL_APPLY_DROP_EVAL) return 1;
+	if(len == TL_APPLY_DROP_EVAL) return TL_RESULT_AGAIN;
 	if(len == TL_APPLY_PUSH_EVAL) {
 		tl_values_push(in, callex);
-		return 1;
+		return TL_RESULT_AGAIN;
 	}
 	if(!tl_is_callable(callex)) {
 		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "call non-callable"), callex));
-		return 0;
+		return TL_RESULT_AGAIN;
 	}
 	for(int i = 0; i < len; i++) {
 		args = tl_new_pair(in, tl_first(in->values), args);
@@ -215,7 +225,7 @@ int tl_apply_next(tl_interp *in) {
 			for(tl_list_iter(args, arg)) {
 				if(callex->kind != TL_THEN && tl_next(arg) != in->true_) {
 					tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "invoke macro/cfunc with non-syntactic arg"), callex), arg));
-					return 0;
+					return TL_RESULT_AGAIN;
 				}
 				new_args = tl_new_pair(in, tl_first(arg), new_args);
 			}
@@ -225,7 +235,7 @@ int tl_apply_next(tl_interp *in) {
 		case TL_CONT:
 			if(len != 1) {
 				tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "bad cont arity (1)"), args));
-				return 0;
+				return TL_RESULT_AGAIN;
 			}
 			in->conts = callex->ret_conts;
 			in->values = callex->ret_values;
@@ -241,13 +251,19 @@ int tl_apply_next(tl_interp *in) {
 			assert(0);
 			break;
 	}
-	return 1;
+	return TL_RESULT_AGAIN;
 }
 
 void _tl_eval_and_then(tl_interp *in, tl_object *expr, tl_object *state, void (*then)(tl_interp *, tl_object *, tl_object *), const char *name) {
 	tl_object *tobj = tl_new_then(in, then, state, name);
 	tl_push_apply(in, 1, tobj, in->env);
 	tl_push_eval(in, expr, in->env);
+}
+
+void _tl_getc_and_then(tl_interp *in, tl_object *state, void (*then)(tl_interp *, tl_object *, tl_object *), const char *name) {
+	tl_object *tobj = tl_new_then(in, then, state, name);
+	tl_push_apply(in, 1, tobj, in->env);
+	tl_push_apply(in, TL_APPLY_GETCHAR, TL_EMPTY_LIST, TL_EMPTY_LIST);
 }
 
 void _tl_eval_all_args_k(tl_interp *in, tl_object *result, tl_object *state) {
@@ -294,5 +310,29 @@ void _tl_eval_all_args(tl_interp *in, tl_object *args, tl_object *state, void (*
 		}
 	} else {
 		tl_push_apply(in, 0, tl_new_then(in, then, state, name), in->env);
+	}
+}
+
+/** Runs an interpreter with one or more pushed evaluations until all evaulation is finished or an error occurs.
+ *
+ * This simply calls `tl_apply_next` in a loop until it returns
+ * `TL_RESULT_DONE`, handing `TL_RESULT_GETCHAR` by using the interpreter's
+ * tl_interp::readf.
+ */
+void tl_run_until_done(tl_interp *in) {
+	int res;
+	while((res = tl_apply_next(in))) {
+		switch(res) {
+			case TL_RESULT_AGAIN:
+				break;
+
+			case TL_RESULT_GETCHAR:
+				tl_values_push(in, tl_new_int(in, (long)tl_getc(in)));
+				break;
+
+			default:
+				assert(0);
+				break;
+		}
 	}
 }

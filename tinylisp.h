@@ -473,6 +473,20 @@ struct tl_interp_s {
 	int putback;
 	/** Whether or not `tl_getc` will return the last "putback". */
 	int is_putback;
+	/** The buffer being built by a `tl_read` call.
+	 *
+	 * This is stored here for efficiency reasons, and little else; it can't be
+	 * part of the state merely because the state has to be GC-able.
+	 *
+	 * This is safe only because `_tl_read_string_k` and `_tl_read_sym_k` are
+	 * not reentrant (per interpreter). Violating this assumption will result
+	 * in UB.
+	 */
+	char *read_buffer;
+	/** The current length of the read buffer. */
+	size_t read_ptr;
+	/** The allocated length of the read buffer. */
+	size_t read_sz;
 	/** The character `tl-display` writes between arguments.
 	 *
 	 * This can be set at runtime with tl-display-sep. By default, it is '\t'
@@ -490,7 +504,12 @@ struct tl_interp_s {
 	 * pointers stored in the interpreter.
 	 */
 	void *udata;
-	/** Function to read a character.
+	/** Function to read a character immediately.
+	 *
+	 * This is only invoked by `tl_run_until_done`, using the default handling
+	 * of `TL_RESULT_GETCHAR`. If you are using `tl_apply_next` directly, your
+	 * handling of `TL_RESULT_GETCHAR` may be different, and this pointer may
+	 * never be invoked (and can safely be NULL).
 	 *
 	 * This is expected to return a C character (a byte) cast to an integer. If
 	 * the stream is closed, it is valid to return `EOF` (defined in this or
@@ -593,11 +612,10 @@ TL_EXTERN void tl_interp_cleanup(tl_interp *);
 
 /** Gets a character from the interpreter's input stream.
  *
- * This is most often called via tl_read(); however, programs can also access
- * this function via `tl-readc`.
- *
- * This only reads from the backing store (tl_interp::readf) if a "putback"
- * isn't set; if one is set, that putback is returned instead.
+ * This "immediate mode" API is deprecated, as it is inherently incompatible
+ * with asynchronous environments. `tl_run_until_done` is the only user of it
+ * by intent; if your environment is asynchronous, implement your own handling
+ * of `TL_RESULT_GETCHAR`.
  */
 #define tl_getc(in) ((in)->is_putback ? ((in)->is_putback = 0, (in)->putback) : (in)->readf((in)))
 /** Put back a character to be read again with `tl_getc`, like `ungetc` in stdio.
@@ -752,8 +770,8 @@ TL_EXTERN int tl_push_eval(tl_interp *, tl_object *, tl_object *);
  * When tl_push_eval returns true, it indicates that an application to be
  * evaluated needs another evaluation to determine the callable (e.g., `((begin
  * display) 7)`). To mark this case, `tl_apply_next` puts this value on the
- * continuation stack to indicate that the value pushes for the next evaluation
- * (queued by `tl_push_apply` is to be used as a callable for the next
+ * continuation stack to indicate that the value pushed for the next evaluation
+ * (queued by `tl_push_apply`) is to be used as a callable for the next
  * application. The current application is said to be "suspended", and will be
  * "resumed" after the callable value is available. (Note that the current
  * application may never resume if this stack is abandoned via resuming another
@@ -781,25 +799,61 @@ TL_EXTERN int tl_push_eval(tl_interp *, tl_object *, tl_object *);
  * finished.
  */
 #define TL_APPLY_DROP_RESCUE -5
+/** A special continuation flag that immediately results in TL_RESULT_GETCHAR.
+ *
+ * This is used by `tl_getc_and_then` to get the actual input.
+ */
+#define TL_APPLY_GETCHAR -6
+/** An application result that indicates that the program is done evaluating.
+ *
+ * `tl_apply_next` returns this when nothing is left to do. Note that it is the
+ * only false value.
+ */
+#define TL_RESULT_DONE 0
+/** An application result that indicates the program is still running.
+ *
+ * `tl_apply_next` returns this regularly during normal evaluation steps,
+ * mostly to clear the C stack ("trampoline") before considering the next
+ * application.
+ *
+ * If this value is encountered, simply call `tl_apply_next` again.
+ */
+#define TL_RESULT_AGAIN 1
+/** An application result that indicates the program is suspended on input.
+ *
+ * `tl_apply_next` returns this whenever a program seeks to read an input byte.
+ * Before resuming, it assumes the input byte has been pushed as a `TL_INT` as
+ * a direct value one the stack. (Technically, via `tl_eval_and_then`, a
+ * syntactic value can be pushed to be evaluated, but this isn't expected to be
+ * typical for simply getting a byte from input.)
+ *
+ * If this value is encountered, make sure to `tl_values_push` a `tl_new_int`
+ * with the read input before calling `tl_apply_next` again.
+ */
+#define TL_RESULT_GETCHAR 2
 TL_EXTERN void tl_push_apply(tl_interp *, long, tl_object *, tl_object *);
 TL_EXTERN int tl_apply_next(tl_interp *);
 TL_EXTERN void _tl_eval_and_then(tl_interp *, tl_object *, tl_object *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
 /** Invokes `_tl_eval_and_then` with the stringified name of the callback. */
 #define tl_eval_and_then(in, ex, st, cb) _tl_eval_and_then((in), (ex), (st), (cb), "tl_eval_and_then:" #cb)
+TL_EXTERN void _tl_getc_and_then(tl_interp *, tl_object *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
+/** Invokes `_tl_getc_and_then` with the stringified name of the callback. */
+#define tl_getc_and_then(in, st, cb) _tl_getc_and_then((in), (st), (cb), "tl_getc_and_then:" #cb)
 TL_EXTERN void _tl_eval_all_args(tl_interp *, tl_object *, tl_object *, void (*)(tl_interp *, tl_object *, tl_object *), const char *);
 /** Invokes `_tl_eval_all_args` with the stringified name of the callback. */
 #define tl_eval_all_args(in, args, state, cb) _tl_eval_all_args((in), (args), (state), (cb), "tl_eval_all_args:" #cb)
-/** Runs an interpreter with one or more pushed evaluations until all evaulation is finished or an error occurs.
- *
- * This simply calls `tl_apply_next` in a loop until it returns false.
- */
-#define tl_run_until_done(in) while(tl_apply_next((in)))
 
 TL_EXTERN void tl_cfbv_evalin(tl_interp *, tl_object *, tl_object *);
 TL_EXTERN void tl_cfbv_call_with_current_continuation(tl_interp *, tl_object *, tl_object *);
 /* tl_object *tl_cf_apply(tl_interp *, tl_object *); */
+void tl_run_until_done(tl_interp *);
 
-TL_EXTERN tl_object *tl_read(tl_interp *, tl_object *);
+TL_EXTERN void tl_read(tl_interp *);
+/** Reads an expression, then invokes the continuation with it as its only argument. */
+#define tl_read_and_then(in, cb, st) do { \
+	tl_push_apply((in), 1, tl_new_then((in), (cb), (st), "tl_read_and_then:" #cb), (in)->env); \
+	tl_read(in); \
+} while(0)
 
 TL_EXTERN void tl_cfbv_read(tl_interp *, tl_object *, tl_object *);
 TL_EXTERN void tl_cfbv_gc(tl_interp *, tl_object *, tl_object *);

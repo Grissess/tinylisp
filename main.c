@@ -50,6 +50,8 @@ int my_modloadf(tl_interp *in, const char *fname) {
 int quiet = QUIET_OFF;
 #define tl_prompt(...) if(quiet == QUIET_OFF) fprintf(stderr, __VA_ARGS__)
 
+int running = 1;
+
 void _main_k(tl_interp *in, tl_object *result, tl_object *_) {
 	tl_prompt("Value: ");
 	if(quiet != QUIET_NO_VALUE && (quiet != QUIET_NO_TRUE || tl_first(result) != in->true_)) {
@@ -65,6 +67,24 @@ void _main_k(tl_interp *in, tl_object *result, tl_object *_) {
 	}
 	tl_cfunc_return(in, in->true_);
 }
+
+void _main_read_k(tl_interp *in, tl_object *args, tl_object *_) {
+	tl_object *expr = tl_first(args);
+	if(!expr) {
+		tl_prompt("Done.\n");
+		tl_interp_cleanup(in);
+		running = 0;
+		tl_cfunc_return(in, in->true_);
+	}
+	if(quiet == QUIET_OFF) {
+		tl_prompt("Read: ");
+		tl_print(in, expr);
+		fflush(stdout);
+		tl_prompt("\n");
+	}
+	in->current = TL_EMPTY_LIST;
+	tl_eval_and_then(in, expr, NULL, _main_k);
+};
 
 TL_CFBV(quiet, "quiet") {
 	if(args) {
@@ -198,22 +218,9 @@ int main() {
 		tl_prompt("\n");
 	}
 
-	while(1) {
+	while(running) {
 		tl_prompt("> ");
-		expr = tl_read(&in, TL_EMPTY_LIST);
-		if(!expr) {
-			tl_prompt("Done.\n");
-			tl_interp_cleanup(&in);
-			return 0;
-		}
-		if(quiet == QUIET_OFF) {
-			tl_prompt("Read: ");
-			tl_print(&in, expr);
-			fflush(stdout);
-			tl_prompt("\n");
-		}
-		in.current = TL_EMPTY_LIST;
-		tl_eval_and_then(&in, expr, NULL, _main_k);
+		tl_read_and_then(&in, _main_read_k, TL_EMPTY_LIST);
 		tl_run_until_done(&in);
 		if(in.error) {
 			/* Don't change these to tl_prompt--errors are always exceptional */
