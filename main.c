@@ -221,7 +221,20 @@ int main() {
 	while(running) {
 		tl_prompt("> ");
 		tl_read_and_then(&in, _main_read_k, TL_EMPTY_LIST);
+#ifdef FAKE_ASYNC
+		while(1) {
+			int res = tl_apply_next(&in);
+			if(!res) break;
+			switch(res) {
+				case TL_RESULT_AGAIN: break;
+				case TL_RESULT_GETCHAR:
+					tl_values_push(&in, tl_new_int(&in, getchar()));
+					break;
+			}
+		}
+#else
 		tl_run_until_done(&in);
+#endif
 		if(in.error) {
 			/* Don't change these to tl_prompt--errors are always exceptional */
 			fprintf(stderr, "Error: ");

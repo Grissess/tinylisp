@@ -2,18 +2,22 @@ var output = null;
 var stdin = "", stdout = "", yielded = false;
 var mod, inst;
 var loop = null;
-var MoreData = {}, EnoughData = {};
+var MoreData = {};
 
-function crank() {
+function crankNL() {
+	if(stdin.indexOf("\n") != -1) crank();
+}
+
+function crank(once) {
 	if(inst == null || loop == null) return;
-	// I insist a goto would have been better here
-	var first = true;
-	while(stdin.length > 0 || first) {
-		first = false;
-		var ix = 0;
-		while(ix < stdin.length) {
-			if(inst.exports.tl_wasm_putc(stdin.charCodeAt(ix)) > 0) break;
-			ix++;
+	while(stdin.length > 0 || once) {
+		once = false;
+		if(yielded) {
+			if(stdin.length == 0) break;
+			var val = inst.exports.tl_new_int(interp, stdin.charCodeAt(0));
+			stdin = stdin.substr(1);
+			inst.exports.tl_wasm_values_push(interp, val);
+			yielded = false;
 		}
 		var res = loop.next();
 		if(res.done) {
@@ -22,13 +26,7 @@ function crank() {
 			return;
 		}
 		if(res.value === MoreData) {
-			if(ix == stdin.length) {
-				break;
-			}
-			continue;
-		}
-		if(res.value === EnoughData) {
-			stdin = stdin.substr(ix);
+			yielded = true;
 			continue;
 		}
 		throw new Error("Not sure how to handle suspension of value " + res.value);
@@ -69,17 +67,21 @@ onmessage = function(e) {
 			if(e.data.key == "Enter") {
 				c = "\n";
 			}
+			if(e.data.key == "Backspace" && stdin.length > 0) {
+				stdin = stdin.substr(0, stdin.length - 1);
+				postMessage({type: "stdin", text: "\b"});
+			}
 			if(c != null) {
 				stdin += c;
 				postMessage({type: "stdin", text: c});
-				crank();
+				crankNL();
 			}
 			break;
 		case "paste":
 			if(e.data.text.length > 0) {
 				stdin += e.data.text;
 				postMessage({type: "stdin", text: e.data.text});
-				crank();
+				crankNL();
 			}
 			break;
 		default:
@@ -89,7 +91,7 @@ onmessage = function(e) {
 }
 
 var STDIN = 0, STDOUT = 1, STDERR = 2, EOF = -1, PAGE = 65536, PTR = 4;
-var watermark = null, interp = null, expr = null, pm_name = null, _main_k_ref = null;
+var watermark = null, interp = null, expr = null, pm_name = null, _main_k_ref = null, main_then = null;
 var running = true;
 function PGOF(x) { return Math.floor(x / PAGE); }
 var PM_NAME = "PRIME_MOVER";
@@ -114,7 +116,7 @@ function init() {
 	var pw = PGOF(watermark), pgs = PGOF(mem.buffer.byteLength);
 	if(pw > pgs) { mem.grow(pw - pgs); }
 	// Find the prime mover
-	var _main_k = inst.exports._main_k;
+	var _main_k = inst.exports._main_read_k;
 	var tbl = inst.exports.__indirect_function_table;
 	for(var i = 0; i < tbl.length; i++) {
 		if(tbl.get(i) === _main_k) {
@@ -130,36 +132,31 @@ function init() {
 	// The rest of this code mirrors tl's ordinary main()
 	inst.exports.tl_interp_init(interp);
 	loop = mainloop();
-	crank();
+	crank(true);
 }
-
-function isTrap(e) { return e instanceof WebAssembly.RuntimeError; }
 
 function* mainloop() {
 	var error;
 	while(running) {
 		inst.exports.tl_wasm_clear_state(interp);
 		eprint("> ");
-		while(true) {
-			try {
-				expr = inst.exports.tl_read(interp, 0);
-				break;
-			} catch(e) {
-				if(isTrap(e)) {
-					yield MoreData;
-				} else throw e;
-			}
+		flush();
+		if(main_then == null) {
+			main_then = inst.exports.tl_new_then(interp, _main_k_ref, 0, pm_name);
 		}
-		yield EnoughData;
-		inst.exports._tl_eval_and_then(interp, expr, 0, _main_k_ref, pm_name);
-		// TODO: trap reads in here as well
+		inst.exports.tl_push_apply(interp, 1, main_then, inst.exports.tl_wasm_get_env(interp));
+		inst.exports.tl_read(interp);
 		while(true) {
-			try {
-				if(!inst.exports.tl_apply_next(interp))
+			var res = inst.exports.tl_apply_next(interp)
+			if(res == 0) break;
+			switch(res) {
+				case 1: break;
+				case 2:
+					yield MoreData;
 					break;
-			} catch(e) {
-				// For now:
-				throw e;
+				default:
+					console.log("Unkown result:", res);
+					break;
 			}
 		}
 		error = inst.exports.tl_wasm_get_error(interp);
@@ -181,7 +178,7 @@ var imports = {
 			print(String.fromCharCode(c));
 		},
 		fgetc: function(fd) {
-			// Not called
+			throw new Error("Should never be called");
 		},
 		halt: function(code) {
 			sysprint("\nProcess exited with code " + code);

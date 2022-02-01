@@ -23,12 +23,29 @@ function addout(txt, kind) {
 	spn.textContent = txt;
 	spn.classList.add(kind);
 	output.appendChild(spn);
+	spn.scrollIntoView();
+}
+
+function backspace() {
+	while(output.lastChild.textContent.length == 0) {
+		output.removeChild(output.lastChild);
+	}
+	var tc = output.lastChild.textContent;
+	if(tc.length == 1) {
+		output.removeChild(output.lastChild);
+	} else {
+		output.lastChild.textContent = tc.substr(0, tc.length - 1);
+	}
 }
 
 function recv(e) {
 	switch(e.data.type) {
 		case "stdout": case "stderr": case "stdin": case "system":
-			addout(e.data.text, classes[e.data.type]);
+			if(e.data.text == "\b") { 
+				backspace();
+			} else {
+				addout(e.data.text, classes[e.data.type]);
+			}
 			break;
 		default:
 			console.log("Unknown message:", e.data);
@@ -62,6 +79,10 @@ document.addEventListener("keydown", onkey);
 document.addEventListener("paste", onpaste);
 </script>
 <style type="text/css">
+:root {
+	--input-color: #00a;
+}
+
 #output {
 	width: 100%;
 	height: 512px;
@@ -69,8 +90,13 @@ document.addEventListener("paste", onpaste);
 	white-space: pre-wrap;
 }
 
+#output *:last-child::after {
+	content: "█";
+	color: var(--input-color);
+}
+
 .error { color: #a00; }
-.input { color: #00a; }
+.input { color: var(--input-color); }
 .system { color: #707; }
 </style>
 	</head>
