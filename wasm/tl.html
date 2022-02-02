@@ -55,10 +55,10 @@ function recv(e) {
 
 function onkey(e) {
 	if(!worker) return;
-	if(!e.ctrlKey) {
-		worker.postMessage({type: "keydown", key: e.key});
-		e.preventDefault();
-	}
+	if(e.ctrlKey) return;
+	if(e.target instanceof HTMLInputElement) return;
+	worker.postMessage({type: "keydown", key: e.key});
+	e.preventDefault();
 }
 
 function onpaste(e) {
@@ -109,7 +109,9 @@ document.addEventListener("paste", onpaste);
 </style>
 	</head>
 	<body>
-		<button onclick="load_file('../std.tl?' + Math.random())">Load Standard Library</button>
+		<button onclick="load_file('../std.tl?' + Math.random());">Load Standard Library</button>
+		<input id="filename" type="text" placeholder="file.tl"/>
+		<button onclick="var ip = document.querySelector('#filename'); load_file('../' + ip.value + '?' + Math.random()); ip.value = '';">Load</button>
 		<div id="output"></div>
 	</body>
 </html>
