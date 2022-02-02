@@ -244,8 +244,8 @@ static void _tl_mark_pass(tl_object *obj) {
 
 /** Perform a garbage collection pass.
  *
- * This calls `tl_free` on objects registered to the garbage collector (via
- * `tl_new` and related) but which are no longer reachable from the roots
+ * This calls ::tl_free on objects registered to the garbage collector (via
+ * ::tl_new and related) but which are no longer reachable from the roots
  * (generally, all `tl_object *` in the interpreter).
  */
 void tl_gc(tl_interp *in) {
@@ -253,6 +253,9 @@ void tl_gc(tl_interp *in) {
 	tl_object *tmp;
 	tl_trace(gc_enter, in);
 	while(obj) {
+#ifdef GC_DEBUG
+		tl_printf(in, "gc: unmark: %p %O\n", obj, obj);
+#endif
 		tl_unmark(obj);
 		obj = tl_next_alloc(obj);
 	}
@@ -266,12 +269,26 @@ void tl_gc(tl_interp *in) {
 	_tl_mark_pass(in->current);
 	_tl_mark_pass(in->conts);
 	_tl_mark_pass(in->values);
+	/* One could make a list of the permanent objects during the unmark scan
+	 * above, but making said list would either (1) require allocation, which
+	 * the GC should NOT do, or (2) require there to be a fixed-size array set
+	 * aside somewhere for the purpose. Neither is a preferable option, so
+	 * we'll just settle for scanning the object list one more time.
+	 */
+	obj = in->top_alloc;
+	while(obj) {
+		if(tl_is_permanent(obj)) _tl_mark_pass(obj);
+		obj = tl_next_alloc(obj);
+	}
 	tl_trace(gc_mark_exit, in);
 	obj = in->top_alloc;
 	while(obj) {
 		tmp = obj;
 		obj = tl_next_alloc(obj);
 		if(!tl_is_marked(tmp)) {
+#ifdef GC_DEBUG
+			tl_printf(in, "gc: free: %p %O\n", tmp, tmp);
+#endif
 			tl_free(in, tmp);
 		}
 	}

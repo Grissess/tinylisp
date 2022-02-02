@@ -74,7 +74,7 @@ void tl_interp_init_alloc(tl_interp *in, void *(*reallocf)(tl_interp *, void *, 
 	in->conts = TL_EMPTY_LIST;
 	in->values = TL_EMPTY_LIST;
 	in->rescue = TL_EMPTY_LIST;
-	in->gc_events = 65536;
+	in->gc_events = TL_DEFAULT_GC_EVENTS;
 	in->ctr_events = 0;
 	in->putback = 0;
 	in->is_putback = 0;

@@ -71,9 +71,17 @@ function onpaste(e) {
 
 function init() {
 	output = document.querySelector("#output");
-	worker = new Worker("worker.js");
+	worker = new Worker("worker.js?" + Math.random());
 	worker.onmessage = recv;
 }
+
+function load_file(fn) {
+	if(!worker) return;
+	fetch(fn).then(resp => resp.text()).then(source =>
+		worker.postMessage({type: "paste", text: source})
+	);
+}
+
 document.addEventListener("DOMContentLoaded", init);
 document.addEventListener("keydown", onkey);
 document.addEventListener("paste", onpaste);
@@ -101,6 +109,7 @@ document.addEventListener("paste", onpaste);
 </style>
 	</head>
 	<body>
+		<button onclick="load_file('../std.tl?' + Math.random())">Load Standard Library</button>
 		<div id="output"></div>
 	</body>
 </html>

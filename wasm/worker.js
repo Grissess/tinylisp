@@ -10,26 +10,31 @@ function crankNL() {
 
 function crank(once) {
 	if(inst == null || loop == null) return;
-	while(stdin.length > 0 || once) {
-		once = false;
-		if(yielded) {
-			if(stdin.length == 0) break;
-			var val = inst.exports.tl_new_int(interp, stdin.charCodeAt(0));
-			stdin = stdin.substr(1);
-			inst.exports.tl_wasm_values_push(interp, val);
-			yielded = false;
+	try {
+		while(stdin.length > 0 || once) {
+			once = false;
+			if(yielded) {
+				if(stdin.length == 0) break;
+				var val = inst.exports.tl_new_int(interp, stdin.charCodeAt(0));
+				stdin = stdin.substr(1);
+				inst.exports.tl_wasm_values_push(interp, val);
+				yielded = false;
+			}
+			var res = loop.next();
+			if(res.done) {
+				sysprint("Main loop exited.\n");
+				loop = null;
+				return;
+			}
+			if(res.value === MoreData) {
+				yielded = true;
+				continue;
+			}
+			throw new Error("Not sure how to handle suspension of value " + res.value);
 		}
-		var res = loop.next();
-		if(res.done) {
-			sysprint("Main loop exited.\n");
-			loop = null;
-			return;
-		}
-		if(res.value === MoreData) {
-			yielded = true;
-			continue;
-		}
-		throw new Error("Not sure how to handle suspension of value " + res.value);
+	} catch(e) {
+		sysprint("A fatal error occurred: " + e + "\n");
+		throw e;
 	}
 }
 
@@ -139,10 +144,12 @@ function* mainloop() {
 	var error;
 	while(running) {
 		inst.exports.tl_wasm_clear_state(interp);
+		inst.exports.tl_gc(interp);  // Take advantage of the cleaner roots
 		eprint("> ");
 		flush();
 		if(main_then == null) {
 			main_then = inst.exports.tl_new_then(interp, _main_k_ref, 0, pm_name);
+			inst.exports.tl_wasm_make_permanent(main_then);
 		}
 		inst.exports.tl_push_apply(interp, 1, main_then, inst.exports.tl_wasm_get_env(interp));
 		inst.exports.tl_read(interp);
@@ -188,7 +195,7 @@ var imports = {
 		},
 		new_heap: function(min, whereptr, szptr) {
 			sysprint("new_heap @" + whereptr + " sz@" + szptr + "\n");
-			var amt = Math.max(min, 32*PAGE);
+			var amt = Math.max(min, 1024*PAGE);
 			if(watermark == null) {
 				watermark = inst.exports['__heap_base'].value;
 			}
@@ -211,7 +218,7 @@ var imports = {
 };
 
 // Work around issues with the MIME type provided by simple servers
-fetch("../tl.wasm").then(resp =>
+fetch("../tl.wasm?" + Math.random()).then(resp =>
 	resp.arrayBuffer()
 ).then(buf => 
 	WebAssembly.instantiate(

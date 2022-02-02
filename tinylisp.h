@@ -17,6 +17,23 @@
 #define EOF ((int) -1)
 #endif
 
+#ifndef TL_DEFAULT_GC_EVENTS
+/** The default number of GC events before a collection is attempted.
+ *
+ * This is 65536 by default, and refers to the number of ::tl_apply_next calls
+ * between automatic collections. This will eventually be superseded by a
+ * collector cognizant of load.
+ */
+#define TL_DEFAULT_GC_EVENTS 65536
+#endif
+
+#if defined(PTR_LSB_AVAILABLE)
+#define TL_FMASK ((1 << PTR_LSB_AVAILABLE) - 1)
+#if PTR_LSB_AVAILABLE < 2
+#define NO_GC_PACK
+#endif
+#endif
+
 #if defined(MODULE) && !defined(MODULE_BUILTIN)
 /** `extern` keyword used throughout the header
  *
@@ -66,48 +83,75 @@ typedef struct tl_name_s tl_name;
 typedef struct tl_object_s {
 	/** The type of this object. Instead of testing this directly, you should prefer the `tl_is_*` macros instead. */
 	enum {
-		/** \anchor TL_INT Integer objects (C long). */
+		/** TL_INT Integer objects (C long).
+		 *
+		 * Created by ::tl_new_int .
+		 */
 		TL_INT,
-		/** \anchor TL_SYM Symbol objects (loosely, strings, but not C strings). */
+		/** TL_SYM Symbol objects (loosely, strings, but not C strings).
+		 *
+		 * Created by ::tl_new_sym or ::tl_new_sym_data .
+		 */
 		TL_SYM,
-		/** A `cons` pair. */
+		/** TL_PAIR A `cons` pair.
+		 *
+		 * Created by ::tl_new_pair .
+		 */
 		TL_PAIR,
-		/** A C continuation; the object C code pushes on the stack to defer evaluation. */
+		/** A C continuation; the object C code pushes on the stack to defer evaluation.
+		 *
+		 * Created by ::tl_new_then .
+		 */
 		TL_THEN,
-		/** A built-in function taking arguments by name. */
+		/** A built-in function taking arguments by name.
+		 *
+		 * Created by ::tl_new_cfunc .
+		 */
 		TL_CFUNC,
-		/** A built-in function taking arguments by value. */
+		/** A built-in function taking arguments by value.
+		 *
+		 * Created by ::tl_new_cfunc_byval .
+		 */
 		TL_CFUNC_BYVAL,
-		/** A user-defined function taking arguments (and an environment) by name. */
+		/** A user-defined function taking arguments (and an environment) by name.
+		 *
+		 * Created by ::tl_new_macro .
+		 */
 		TL_MACRO,
-		/** A user-defined function taking arguments by value. */
+		/** A user-defined function taking arguments by value.
+		 *
+		 * Created by ::tl_new_func .
+		 */
 		TL_FUNC,
-		/** A continuation object; the object passed by `call-with-current-continuation`, which resumes evaluation state. */
+		/** A continuation object; the object passed by `call-with-current-continuation`, which resumes evaluation state.
+		 *
+		 * Created by ::tl_new_cont .
+		 */
 		TL_CONT,
 	} kind;
 	union {
-		/** For \ref TL_INT, the signed long integer value. Note that TL does not internally support unlimited precision. */
+		/** For ::TL_INT, the signed long integer value. Note that TL does not internally support unlimited precision. */
 		long ival;
-		/** For \ref TL_SYM, the name in the interpreter's namespace trie, comparable by pointer equality. */
+		/** For ::TL_SYM, the name in the interpreter's namespace trie, comparable by pointer equality. */
 		tl_name *nm;
 		struct {
-			/** For (non-NULL) \ref TL_PAIR, a pointer to the first of the pair (CAR in traditional LISP). */
+			/** For (non-NULL) ::TL_PAIR, a pointer to the first of the pair (CAR in traditional LISP). */
 			struct tl_object_s *first;
-			/** For (non-NULL) \ref TL_PAIR, a pointer to the next of the pair (CDR in traditional LISP). */
+			/** For (non-NULL) ::TL_PAIR, a pointer to the next of the pair (CDR in traditional LISP). */
 			struct tl_object_s *next;
 		};
 		struct {
-			/** For \ref TL_THEN and \ref TL_CFUNC, a pointer to the actual C function. */
+			/** For ::TL_THEN and ::TL_CFUNC, a pointer to the actual C function. */
 			void (*cfunc)(tl_interp *, struct tl_object_s *, struct tl_object_s *);
-			/** For \ref TL_THEN, the state argument (parameter 3). */
+			/** For ::TL_THEN, the state argument (parameter 3). */
 			struct tl_object_s *state;
-			/** For \ref TL_THEN and \ref TL_CFUNC, a C string containing the name of the function, or NULL. */
+			/** For ::TL_THEN and ::TL_CFUNC, a C string containing the name of the function, or NULL. */
 			char *name;
 		};
 		struct {
-			/** For \ref TL_MACRO and \ref TL_FUNC, the formal arguments (a linear list of symbols). */
+			/** For ::TL_MACRO and ::TL_FUNC, the formal arguments (a linear list of symbols). */
 			struct tl_object_s *args;
-			/** For \ref TL_MACRO and \ref TL_FUNC, the body of the function (a linear list of expressions, usually other lists, for which the last provides the valuation). */
+			/** For ::TL_MACRO and ::TL_FUNC, the body of the function (a linear list of expressions, usually other lists, for which the last provides the valuation). */
 			struct tl_object_s *body;
 			/** For TL_MACRO and TL_FUNC, the environment captured by the function or macro when it was defined. */
 			struct tl_object_s *env;
@@ -115,22 +159,28 @@ typedef struct tl_object_s {
 			struct tl_object_s *envn;
 		};
 		struct {
-			/** For \ref TL_CONT, the evaluation environment to which to return. */
+			/** For ::TL_CONT, the evaluation environment to which to return. */
 			struct tl_object_s *ret_env;
-			/** For \ref TL_CONT, the return continuation stack to which to return. */
+			/** For ::TL_CONT, the return continuation stack to which to return. */
 			struct tl_object_s *ret_conts;
-			/** For \ref TL_CONT, the value stack to which to return. */
+			/** For ::TL_CONT, the value stack to which to return. */
 			struct tl_object_s *ret_values;
 		};
 	};
+#ifdef NO_GC_PACK
+	struct tl_object_s *next_alloc;
+	struct tl_object_s *prev_alloc;
+	unsigned char flags;
+#else
 	union {
 		/** For the garbage collector, a pointer to the next allocated object. */
 		struct tl_object_s *next_alloc;
-		/** As \ref next_alloc but cast to an integer of platform size. Used by the GC for bitpacking. */
+		/** As ::next_alloc but cast to an integer of platform size. Used by the GC for bitpacking. */
 		size_t next_alloc_i;
 	};
 	/** For the garbage collector, a pointer to the previous allocated object. */
 	struct tl_object_s *prev_alloc;
+#endif
 } tl_object;
 
 /** For the garbage collector, the bitmask for bitpacking into tl_object::next_alloc_i .
@@ -140,13 +190,44 @@ typedef struct tl_object_s {
  * processors (and possibly some others), but may need to be manually tweaked
  * for esoteric platofms.
  */
+#ifndef TL_FMASK
 #define TL_FMASK 0x3
+#endif
 /** Mark bit for bitpacking int tl_object::next_alloc_i .
  *
  * The garbage collector uses this to mark objects during the mark pass of its
  * mark/sweep operation.
  */
 #define TL_F_MARK 0x1
+/** Bit to ask the GC not to collect this object.
+ *
+ * This bit allows external program to depend on the existence of an object,
+ * even if it isn't references from an interpreter root. In effect, this makes
+ * the object its own, free-floating root. It is expected that the runtime
+ * holds a (per-interpreter) pointer to this, and will free it when it is no
+ * longer needed.
+ *
+ * This property is transitive; objects this refers to will be kept alive as
+ * well.
+ *
+ * Marking an object as permanent does not prevent it from being freed during
+ * tl_interp_cleanup(); all objects allocated under the interpreter are
+ * destroyed during that time.
+ */
+#define TL_F_PERMANENT 0x2
+
+#ifdef NO_GC_PACK
+
+#define tl_mark(obj) ((obj)->flags |= TL_F_MARK)
+#define tl_unmark(obj) ((obj)->flags &= ~TL_F_MARK)
+#define tl_is_marked(obj) ((obj)->flags & TL_F_MARK)
+#define tl_make_permanent(obj) ((obj)->flags |= TL_F_PERMANENT)
+#define tl_make_transient(obj) ((obj)->flags &= ~TL_F_PERMANENT)
+#define tl_is_permanent(obj) ((obj)->flags & TL_F_PERMANENT)
+#define tl_next_alloc(obj) ((obj)->next_alloc)
+#define tl_make_next_alloc(orig, ptr) (ptr)
+
+#else
 
 /** Mark an object.
  *
@@ -170,6 +251,22 @@ typedef struct tl_object_s {
  * This is generally only valid after a mark pass of the garbage collector.
  */
 #define tl_is_marked(obj) ((obj)->next_alloc_i & TL_F_MARK)
+/** Cause the object to become permanent.
+ *
+ * This effectively causes the object to behave like its own GC root. See the
+ * discussion of ::TL_F_PERMANENT for details.
+ */
+#define tl_make_permanent(obj) ((obj)->next_alloc_i |= TL_F_PERMANENT)
+/** Cause the object to become transient.
+ *
+ * This unsets permanency, as via ::tl_make_permanent.
+ */
+#define tl_make_transient(obj) ((obj)->next_alloc_i &= ~TL_F_PERMANENT)
+/** Determine whether the object is permanent.
+ *
+ * This tests the ::TL_F_PERMANENT flag; see it for details.
+ */
+#define tl_is_permanent(obj) ((obj)->next_alloc_i & TL_F_PERMANENT)
 /** Safely dereference the next allocated object.
  *
  * This is necessary because the low bits may have packed flags via
@@ -187,6 +284,8 @@ typedef struct tl_object_s {
  * doubly-linked-list valid by updating tl_object::prev_alloc as well.
  */
 #define tl_make_next_alloc(orig, ptr) ((tl_object *)(((obj)->next_alloc_i & (~TL_FMASK)) | (((size_t)(orig)) & TL_FMASK)))
+
+#endif
 
 TL_EXTERN tl_object *tl_new(tl_interp *);
 TL_EXTERN tl_object *tl_new_int(tl_interp *, long);
@@ -208,31 +307,33 @@ TL_EXTERN tl_object *tl_new_cont(tl_interp *, tl_object *, tl_object *, tl_objec
 TL_EXTERN void tl_free(tl_interp *, tl_object *);
 TL_EXTERN void tl_gc(tl_interp *);
 
-/** Test whether an object is a \ref TL_INT. */
+/** Test whether an object is a ::TL_INT. */
 #define tl_is_int(obj) ((obj) && (obj)->kind == TL_INT)
-/** Test whether an object is a \ref TL_SYM. */
+/** Test whether an object is a ::TL_SYM. */
 #define tl_is_sym(obj) ((obj) && (obj)->kind == TL_SYM)
 /* FIXME: NULL is a valid empty list */
-/** Test whether an object is a pair. Note that NULL and TL_EMPTY_LIST are
- *   equivalent, so NULL is a valid pair.
+/** Test whether an object is a pair.
+ *
+ * Note that NULL and ::TL_EMPTY_LIST are equivalent, so NULL is a valid
+ * pair.
  */
 #define tl_is_pair(obj) (!(obj) || (obj)->kind == TL_PAIR)
-/** Test whether an object is a TL_THEN. */
+/** Test whether an object is a ::TL_THEN. */
 #define tl_is_then(obj) ((obj) && (obj)->kind == TL_THEN)
-/** Test whether an object is a TL_CFUNC. */
+/** Test whether an object is a ::TL_CFUNC. */
 #define tl_is_cfunc(obj) ((obj) && (obj)->kind == TL_CFUNC)
-/** Test whether an object is a TL_CFUNC_BYVAL. */
+/** Test whether an object is a ::TL_CFUNC_BYVAL. */
 #define tl_is_cfunc_byval(obj) ((obj) && (obj)->kind == TL_CFUNC_BYVAL)
-/** Test whether an object is a TL_MACRO. */
+/** Test whether an object is a ::TL_MACRO. */
 #define tl_is_macro(obj) ((obj) && (obj)->kind == TL_MACRO)
-/** Test whether an object is a TL_FUNC. */
+/** Test whether an object is a ::TL_FUNC. */
 #define tl_is_func(obj) ((obj) && (obj)->kind == TL_FUNC)
-/** Test whether an object is a TL_CONT. */
+/** Test whether an object is a ::TL_CONT. */
 #define tl_is_cont(obj) ((obj) && (obj)->kind == TL_CONT)
 /** Test whether an object is callable; that is, it can be on the left side of
  *   an application.
  *
- *   Currently, the list includes TL_CFUNC, TL_CFUNC_BYVAL, TL_THEN, TL_MACRO, TL_FUNC, and TL_CONT.
+ *   Currently, the list includes ::TL_CFUNC, ::TL_CFUNC_BYVAL, ::TL_THEN, ::TL_MACRO, ::TL_FUNC, and ::TL_CONT.
  */
 #define tl_is_callable(obj) (tl_is_cfunc(obj) || tl_is_cfunc_byval(obj) || tl_is_then(obj)|| tl_is_macro(obj) || tl_is_func(obj) || tl_is_cont(obj))
 
@@ -642,8 +743,8 @@ TL_EXTERN void tl_interp_cleanup(tl_interp *);
 /** Invoke the interpreter's malloc function.
  *
  * See tl_interp::reallocf for details. This is called most often via tl_new(),
- * but also called by other routines which must prepare strings (such as \ref
- * TL_SYM via tl_new_sym() and tl_read()).
+ * but also called by other routines which must prepare strings (such as
+ * ::TL_SYM via tl_new_sym() and tl_read()).
  */
 #define tl_alloc_malloc(in, n) tl_alloc_realloc(in, NULL, n)
 /** Invoke the interpreter's free function.
@@ -920,6 +1021,10 @@ void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
  * Exactly the same as `TL_CF`, but the underlying function is
  * `TL_CFUNC_BYVAL`, which will receive all of its arguments by value, instead
  * of by name as default.
+ *
+ * Since eval is a one-way arrow (from syntax to value), `TL_CFUNC_BYVAL` is
+ * generally easier to invoke. It should be preferred unless it can't be
+ * avoided, including for nilary functions (with no expected arguments).
  */
 #define TL_CFBV(func, nm) TL_CF_FLAGS(func, nm, TL_EF_BYVAL)
 

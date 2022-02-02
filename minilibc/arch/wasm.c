@@ -25,6 +25,10 @@ tl_object *tl_wasm_get_env(tl_interp *in) {
 	return in->env;
 }
 
+void tl_wasm_make_permanent(tl_object *obj) {
+	tl_make_permanent(obj);
+}
+
 void tl_wasm_clear_state(tl_interp *in) {
 	in->error = NULL;
 	in->conts = TL_EMPTY_LIST;

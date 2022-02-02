@@ -4,6 +4,20 @@
 #include "stdio.h"
 #include "arch.h"
 
+#if defined(PTR_LSB_AVAILABLE) && PTR_LSB_AVAILABLE == 0
+#define NO_MEM_PACK
+#endif
+
+#ifdef NO_MEM_PACK
+
+#define fl_set_used(fl) ((fl)->is_used = 1)
+#define fl_set_unused(fl) ((fl)->is_used = 0)
+#define fl_next(fl) ((fl)->next)
+#define fl_used(fl) ((fl)->is_used)
+#define fl_make_next(fl, nptr) (nptr)
+
+#else
+
 #define MF_INUSE 1
 #define MF_ALL (MF_INUSE)
 #define fl_next(fl) ((struct freelist *)(((size_t)(fl)->next)&~MF_ALL))
@@ -18,6 +32,8 @@
 #define fl_set_unused(fl) ((fl)->next = (struct freelist *)(((size_t)(fl)->next)&~MF_INUSE))
 #endif
 
+#endif
+
 #define BAD_SIZE ((size_t) -1)
 #define fl_real_size(fl) ((size_t)(((fl) && fl_next((fl))) ? ((size_t) fl_next((fl))) - ((size_t) (fl)) : BAD_SIZE))
 #define fl_size(fl) (fl_real_size((fl)) == BAD_SIZE || fl_real_size((fl)) < sizeof(struct freelist) ? BAD_SIZE : fl_real_size((fl)) - sizeof(struct freelist))
@@ -29,7 +45,7 @@ struct freelist {
 	struct freelist *next;
 	struct freelist *nextfree;
 	struct freelist *prevfree;
-#ifdef MEM_DEBUG
+#if defined(MEM_DEBUG) || defined(NO_MEM_PACK)
 	char is_used;
 #endif
 };

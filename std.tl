@@ -206,6 +206,7 @@
 	  ((= (car path) 'i) (tl-make-path var (cdr path))))))
 (define tl-make-cxr
   (lambda (perm)
+	(display 'tl-make-cxr perm)
 	(let* (
 		   (conc (apply tl-concat (filter (lambda (x) (not (= x 'i))) perm)))
 		   (sym (tl-concat 'c conc 'r))

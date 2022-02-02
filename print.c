@@ -162,6 +162,11 @@ void tl_printf(tl_interp *in, const char *cur, ...) {
 					cur++;
 					break;
 
+				case 'O':  /* non-standard */
+					tl_print(in, va_arg(ap, tl_object *));
+					cur++;
+					break;
+
 				default:
 					tl_putc(in, '%');
 					tl_putc(in, *cur++);

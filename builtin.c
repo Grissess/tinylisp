@@ -504,3 +504,15 @@ TL_CFBV(rescue, "rescue") {
 	tl_push_apply(in, TL_APPLY_DROP_RESCUE, TL_EMPTY_LIST, TL_EMPTY_LIST);
 	tl_push_apply(in, 0, func, in->env);
 }
+
+TL_CFBV(all_objects, "all-objects") {
+	/* Order is important: capture the top_alloc before making a new object */
+	tl_object *cur = in->top_alloc;
+	tl_object *res = TL_EMPTY_LIST;
+	/* FIXME: if memory pressure causes a GC, this could break spectacularly */
+	while(cur) {
+		res = tl_new_pair(in, cur, res);
+		cur = tl_next_alloc(cur);
+	}
+	tl_cfunc_return(in, res);
+}

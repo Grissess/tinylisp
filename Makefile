@@ -40,7 +40,8 @@ Influential variables (and their current values):
 		Additional options for your C compiler.
 
 	DEFINES = $(DEFINES)
-		Items that will be appended to CFLAGS.
+		Items that will be appended to CFLAGS. See
+		'Preprocessor configuration', below.
 
 	LD = $(LD)
 		Your linker.
@@ -87,6 +88,84 @@ Influential variables (and their current values):
 			1: Output a simplified line (and the above).
 			2: Show the full command line, as usual.
 			3: Show everything, including this infrastructure.
+
+Preprocessor configuration:
+	While these can be passed in CFLAGS, the variable
+	DEFINES is provided for your convenience to add these
+	flags. It defaults to empty, while CFLAGS may be changed
+	by your target or other configuration. Most of these are
+	optional, but some may be forced by CFLAGS on various
+	targets.
+
+- Debugging macros:
+	The debug macros will generally make your executable
+	larger and very much slower--use them sparingly.
+
+	-DNS_DEBUG
+		Namespace debugging; prints out large amounts of
+		debugging information about the symbol-interning
+		"namespace" system.
+
+	-DCONT_DEBUG
+		Continuation debugging; prints out large amounts of
+		information about the evaluation loop, including all
+		the continuations encountered and the interpreter
+		state at each tl_apply_next step.
+
+	-DMEM_DEBUG
+		Memory debugging; if USE_MINILIBC=1, this prints out
+		large amounts of information about the Minilibc
+		memory allocator, including every call to malloc()
+		and free().
+
+	-DGC_DEBUG
+		Garbage collector debugging; prints out large
+		amounts of information about every collector run,
+		including every object encountered and freed.
+
+	-DFAKE_ASYNC
+		Move the handling of TL_RESULT_GETCHAR into main(),
+		using the libc getchar() function, to more
+		faithfully emulate asynchronous input targets.
+
+- Platform macros:
+	These macros usually express configuration options that
+	may not be available on all platforms. Some platforms will force options from this list.
+
+	-DPTR_LSB_AVAILABLE=X
+		The bottom X bits of a pointer are available. If
+		this is too few, it implies some other macros below,
+		including NO_GC_PACK and NO_MEM_PACK.
+
+	-DNO_GC_PACK
+		Don't bitpack the GC mark into the intrusive list;
+		this makes objects larger, but is necessary on some
+		targets which either can't align allocations or have
+		native alignments of single bytes. Implied if
+		PTR_LSB_AVAILABLE == 0.
+
+	-DNO_MEM_PACK
+		Don't bitpack the malloc mark into the intrusive
+		list; this means allocations will have more overhead
+		per-allocation, but is strictly necessary on some
+		targets as above. Implied if PTS_LSB_AVAILABLE == 0;
+		MEM_DEBUG causes a similar change, but continues to
+		pack the bit anyway for debugging purposes unless
+		this is turned off.
+	
+	-DHAVE_SYSTEMTAP
+		Compile against the SystemTap userspace libraries to
+		instrument the binary with UDSTs.
+
+	-DTL_DEFAULT_GC_EVENTS=X
+		After X events, attempt an automatic GC. A GC
+		already occurs as part of the main REPL, but this
+		allows collections to occur in the middle of user
+		code. This will be deprecated once a load-based GC
+		strategy is implemented. The default is 65536.
+
+	Your current CFLAGS, which include DEFINES, are:
+		$(CFLAGS)
 endef
 
 ALL_MODULES = io
