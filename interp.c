@@ -9,7 +9,16 @@ extern tl_init_ent __start_tl_init_ents, __stop_tl_init_ents;
 static int _readf(tl_interp *in) { return getchar(); }
 static void _writef(tl_interp *in, const char c) { putchar(c); }
 static int _modloadf(tl_interp *in, const char *fn) { return 0; }
-static void *_reallocf(tl_interp *in, void *ptr, size_t s) { return realloc(ptr, s); }
+static void *_reallocf(tl_interp *in, void *ptr, size_t s) {
+	/* Valgrind is unhappy unless this actually uses free, so we'll force this
+	 * to occur.
+	 */
+	if(!s) {
+		free(ptr);
+		return NULL;
+	}
+	return realloc(ptr, s);
+}
 
 /** Initialize a TinyLISP interpreter.
  *

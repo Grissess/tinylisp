@@ -74,7 +74,7 @@ void _main_read_k(tl_interp *in, tl_object *args, tl_object *_) {
 		tl_prompt("Done.\n");
 		tl_interp_cleanup(in);
 		running = 0;
-		tl_cfunc_return(in, in->true_);
+		return;  /* Don't push anything, the interpreter is already dead */
 	}
 	if(quiet == QUIET_OFF) {
 		tl_prompt("Read: ");
@@ -235,6 +235,13 @@ int main() {
 #else
 		tl_run_until_done(&in);
 #endif
+		if(!running) {
+			/* Don't inspect anything--tl_interp_cleanup was
+			 * already called, so these values are
+			 * poisonous.
+			 */
+			break;
+		}
 		if(in.error) {
 			/* Don't change these to tl_prompt--errors are always exceptional */
 			fprintf(stderr, "Error: ");
