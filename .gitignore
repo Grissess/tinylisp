@@ -5,6 +5,5 @@ tl.*
 ns_test
 a.out
 *.tar.xz
-/doc
 /doc_html
 /doxyxml
