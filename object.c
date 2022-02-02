@@ -280,7 +280,9 @@ void tl_gc(tl_interp *in) {
 
 /** Returns the length of a list.
  *
- * This is the number of iterations that would be done by `tl_list_iter`.
+ * This is defined as the number of iterations that would be done by \ref
+ * tl_list_iter . This might not be what you're expecting; for example, an
+ * improper list has its tail counted toward its length,
  */
 size_t tl_list_len(tl_object *l) {
 	size_t cnt = 0;

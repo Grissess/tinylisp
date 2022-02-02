@@ -18,8 +18,6 @@
 #endif
 
 #if defined(MODULE) && !defined(MODULE_BUILTIN)
-#define TL_EXTERN extern
-#else
 /** `extern` keyword used throughout the header
  *
  * This is set to `extern` whenever the current source (.c) file is being
@@ -27,6 +25,8 @@
  * in this library are external (because they are in the interpreter which
  * loads them). It is defined as an empty string otherwise.
  */
+#define TL_EXTERN extern
+#else
 #define TL_EXTERN
 #endif
 
@@ -298,7 +298,7 @@ typedef struct tl_ns_s {
  *
  * This represents the state of the TinyLISP interpreter at any given point in
  * time. Multiple interpreters can exist simultaneously; TinyLISP is fully
- * reentrant.
+ * reentrant as long as its upcalls (for memory allocation and IO) are.
  *
  * After allocating space for one, an interpreter is initialized using
  * `tl_interp_init` (though some other tasks follow this call; see that
