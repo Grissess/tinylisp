@@ -213,6 +213,12 @@
 		   )
 	  (eval `(set! ,sym (lambda (l) ,(tl-make-path 'l perm)))))))
 
+(define tl-if-defined
+  (macro (var iftrue iffalse) env
+		 (if (= (tl-eval-in env `(tl-rescue (lambda () ,var #t))) #t)
+		   (tl-eval-in env iftrue)
+		   (tl-eval-in env iffalse))))
+
 ; Language essentials
 
 (define list
@@ -244,7 +250,9 @@
 (define cdar (lambda (l) (cdr (car l))))
 (define cadr (lambda (l) (car (cdr l))))
 (define cadar (lambda (l) (car (cdr (car l)))))
-(tl-permute '((a d) (a d) (a d i) (a d i)) tl-make-cxr)
+(tl-if-defined no-cxr
+			   #t
+			   (tl-permute '((a d) (a d) (a d i) (a d i)) tl-make-cxr))
 
 ; List manipulation
 
