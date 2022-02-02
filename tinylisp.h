@@ -879,10 +879,21 @@ static int tl_init
 
 #endif  /* ifdef MODULE */
 
+/** Set to indicate the function is `CFUNC_BYVAL` instead of `CFUNC`. */
 #define TL_EF_BYVAL 0x01
+/** Type of an initialization entry.
+ *
+ * At compilation time, a number of these entries are put into the same binary
+ * section, which the linker then merges (in a specific but unimportant order)
+ * into a region which is effectively-addressable as an array. `tl_interp_init`
+ * reads from this array, using it to populate the tl_interp::top_env.
+ */
 typedef struct tl_init_ent_s {
+	/** The C function to invoke. */
 	void (*fn)(tl_interp *, tl_object *, tl_object *);
+	/** The name this `CFUNC`/`CFUNC_BYVAL` should have in the environment. */
 	const char *name;
+	/** `TL_EF` constants, OR'd together. */
 	size_t flags;
 } __attribute__((aligned(8))) tl_init_ent;
 #define TL_CF_FLAGS(func, nm, f) void tl_cf_##func(tl_interp *, tl_object *, tl_object *);\
@@ -890,7 +901,26 @@ static tl_init_ent __attribute__((section("tl_init_ents"),aligned(8),used)) init
 	.fn = tl_cf_##func, .name = "tl-" nm, .flags = (f),\
 };\
 void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
+/** Declare a CFUNC.
+ *
+ * `func` must be a syntactically-valid C identifier, to which other fragments of identifier will be prepended. `nm` is the name to which the function will be bound in the interpreter's tl_interp::top_env.
+ *
+ * This macro expands to a prototype, a declaration, and the beginning of a
+ * function definition, such that it is suitable to follow by a function body
+ * in a brace block. The arguments are declared as follows:
+ *
+ *		`(tl_interp *in, tl_object *args, tl_object *_)`
+ *
+ * (The `_` argument is a "state" argument, which is always `NULL` for
+ * non-continuations, but a necessary part of the function type.)
+ */
 #define TL_CF(func, nm) TL_CF_FLAGS(func, nm, 0)
+/** Declare a CFUNC_BYVAL.
+ *
+ * Exactly the same as `TL_CF`, but the underlying function is
+ * `TL_CFUNC_BYVAL`, which will receive all of its arguments by value, instead
+ * of by name as default.
+ */
 #define TL_CFBV(func, nm) TL_CF_FLAGS(func, nm, TL_EF_BYVAL)
 
 #define tl_min(x, y) ((x) < (y) ? (x) : (y))
