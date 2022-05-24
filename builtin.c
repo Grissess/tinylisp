@@ -209,6 +209,8 @@ TL_CFBV(topenv, "top-env") {
 TL_CFBV(concat, "concat") {
 	char *buffer, *end, *src;
 	size_t sz = 0, rsz;
+  tl_object *ret;
+
 	for(tl_list_iter(args, val)) {
 		if(tl_is_int(val)) {
 			char *buf;
@@ -221,6 +223,7 @@ TL_CFBV(concat, "concat") {
 			assert(buf);
 			snprintf(buf, sz + 1, "%ld", val->ival);
 			val = tl_new_sym(in, buf);
+      free(buf);
 			l_val->first = val;
 		}
 		if(tl_is_sym(val)) {
@@ -244,7 +247,9 @@ TL_CFBV(concat, "concat") {
 			sz--;
 		}
 	}
-	tl_cfunc_return(in, tl_new_sym_data(in, buffer, rsz));
+  ret = tl_new_sym_data(in, buffer, rsz);
+  free(buffer);
+	tl_cfunc_return(in, ret);
 }
 
 TL_CFBV(length, "length") {

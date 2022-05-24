@@ -307,16 +307,22 @@
 
 ; loop/recur
 
-(define tl-loop-co-sym '#tl-loop)
+(define tl-loop-co-sym '#tl-continue)
+(define tl-loop-br-sym '#tl-break)
 
 (define loop
   (macro (bindings . body) env
-		 (tl-eval-in env `(apply (lambda ,(cons tl-loop-co-sym (map car bindings))
-								   @body
-								   )
-								 (call/cc (lambda (co) (cons co (quote ,(map cadr bindings)))))))))
+		 (tl-eval-in env `(call/cc (lambda (,tl-loop-br-sym)
+									 (apply (lambda ,(cons tl-loop-co-sym (map car bindings))
+											  @body
+											  )
+											(call/cc (lambda (co) (cons co (quote ,(map cadr bindings)))))))))))
 
 (define recur
   (macro args env
 		 (tl-eval-in env
 					 `((eval ,tl-loop-co-sym) (list (eval ,tl-loop-co-sym) @args)))))
+
+(define break
+  (macro (value) env
+		 (tl-eval-in env `((eval ,tl-loop-br-sym) ,value))))

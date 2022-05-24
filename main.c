@@ -102,7 +102,7 @@ TL_CFBV(quiet, "quiet") {
 
 TL_CFBV(exit, "exit") {
 	if(!args || !tl_is_int(tl_first(args))) {
-		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "tl-quit on non-int"), args));
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "tl-exit on non-int"), args));
 		tl_cfunc_return(in, in->false_);
 	}
 	exit(tl_first(args)->ival);
