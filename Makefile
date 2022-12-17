@@ -130,7 +130,8 @@ Preprocessor configuration:
 
 - Platform macros:
 	These macros usually express configuration options that
-	may not be available on all platforms. Some platforms will force options from this list.
+	may not be available on all platforms. Some platforms will force options
+	from this list.
 
 	-DPTR_LSB_AVAILABLE=X
 		The bottom X bits of a pointer are available. If
@@ -138,11 +139,11 @@ Preprocessor configuration:
 		including NO_GC_PACK and NO_MEM_PACK.
 
 	-DNO_GC_PACK
-		Don't bitpack the GC mark into the intrusive list;
+		Don't bitpack the GC marks into the intrusive list;
 		this makes objects larger, but is necessary on some
 		targets which either can't align allocations or have
 		native alignments of single bytes. Implied if
-		PTR_LSB_AVAILABLE == 0.
+		PTR_LSB_AVAILABLE < 2.
 
 	-DNO_MEM_PACK
 		Don't bitpack the malloc mark into the intrusive
