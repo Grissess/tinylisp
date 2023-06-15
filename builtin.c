@@ -479,18 +479,14 @@ TL_CFBV(read, "read") {
 TL_CFBV(load_mod, "load-mod") {
 #ifdef CONFIG_MODULES
 	tl_object *name = tl_first(args);
-	char *name_cstr;
+	char *name_cstr = tl_sym_to_cstr(in, name);
 	tl_object *ret;
 
-	if(!tl_is_sym(name)) {
+	if(!name_cstr) {
 		tl_cfunc_return(in, in->false_);
 	}
-	name_cstr = tl_alloc_malloc(in, name->nm->here.len + 1);
-	assert(name_cstr);
-	memcpy(name_cstr, name->nm->here.data, name->nm->here.len);
-	name_cstr[name->nm->here.len] = 0;
 	ret = _boolify(in->modloadf(in, name_cstr));
-	free(name_cstr);
+	tl_alloc_free(in, name_cstr);
 	tl_cfunc_return(in, ret);
 #else
 	tl_cfunc_return(in, in->false_);

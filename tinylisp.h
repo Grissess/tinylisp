@@ -72,6 +72,16 @@
 typedef struct tl_interp_s tl_interp;
 typedef struct tl_name_s tl_name;
 
+/** The type of "type tags".
+ *
+ * These can be attached to application data (::TL_PTR) to indicate an
+ * originator. You should get one of these through ::tl_new_tag if you need
+ * one.
+ */
+typedef size_t tl_tag;
+/** A reserved value for "no tag" */
+#define TL_NO_TAG ((tl_tag)0)
+
 /** Object structure
  *
  * This structure describes every TinyLisp object at runtime, and contains the
@@ -128,6 +138,11 @@ typedef struct tl_object_s {
 		 * Created by ::tl_new_cont .
 		 */
 		TL_CONT,
+		/** A pointer object; an opaque type useful for extension developers.
+		 *
+		 * Created by ::tl_new_ptr .
+		 */
+		TL_PTR,
 	} kind;
 	union {
 		/** For ::TL_INT, the signed long integer value. Note that TL does not internally support unlimited precision. */
@@ -141,7 +156,13 @@ typedef struct tl_object_s {
 			struct tl_object_s *next;
 		};
 		struct {
-			/** For ::TL_THEN and ::TL_CFUNC, a pointer to the actual C function. */
+			/** For ::TL_THEN and ::TL_CFUNC, a pointer to the actual C function.
+			 *
+			 * The arguments are:
+			 * - the active interpreter (from which the environment can be derived), 
+			 * - a TL list of arguments to be applied (evaluated if this is a ::TL_CFUNC_BYVAL ),
+			 * - the ::state below, which is usually NULL unless this is a ::TL_THEN .
+			 */
 			void (*cfunc)(tl_interp *, struct tl_object_s *, struct tl_object_s *);
 			/** For ::TL_THEN, the state argument (parameter 3). */
 			struct tl_object_s *state;
@@ -165,6 +186,20 @@ typedef struct tl_object_s {
 			struct tl_object_s *ret_conts;
 			/** For ::TL_CONT, the value stack to which to return. */
 			struct tl_object_s *ret_values;
+		};
+		struct {
+			/** For ::TL_PTR, the underlying pointer. */
+			void *ptr;
+			/** For ::TL_PTR, if not NULL, a function to call on the pointer when the object is garbage-collected (usually to free associated resources).
+			 *
+			 * This is called whenever the object is GC'd; see ::tl_gc and ::tl_free . Care must be taken if ::ptr can be aliased.
+			 */
+			void (*gcfunc)(tl_interp *, struct tl_object_s *);
+			/** For ::TL_PTR, the tag assigned to this pointer.
+			 *
+			 * This can be used for source comparisons--see ::tl_tag.
+			 */
+			tl_tag tag;
 		};
 	};
 #ifdef NO_GC_PACK
@@ -304,6 +339,7 @@ TL_EXTERN tl_object *tl_new_macro(tl_interp *, tl_object *, tl_object *, tl_obje
 /** Creates a new lambda (recognized as a macro without an envname) */
 #define tl_new_func(in, args, body, env) tl_new_macro((in), (args), NULL, (body), (env))
 TL_EXTERN tl_object *tl_new_cont(tl_interp *, tl_object *, tl_object *, tl_object *);
+TL_EXTERN tl_object *tl_new_ptr(tl_interp *, void *, void (*)(tl_interp *, tl_object *), tl_tag);
 TL_EXTERN void tl_free(tl_interp *, tl_object *);
 TL_EXTERN void tl_gc(tl_interp *);
 
@@ -330,6 +366,10 @@ TL_EXTERN void tl_gc(tl_interp *);
 #define tl_is_func(obj) ((obj) && (obj)->kind == TL_FUNC)
 /** Test whether an object is a ::TL_CONT. */
 #define tl_is_cont(obj) ((obj) && (obj)->kind == TL_CONT)
+/** Test whether an object is a ::TL_PTR. */
+#define tl_is_ptr(obj) ((obj) && (obj)->kind == TL_PTR)
+/** Test wither an object is a ::TL_PTR with the appropriate tag. */
+#define tl_is_tag(obj, tg) (tl_is_ptr((obj)) && (obj)->tag == (tg))
 /** Test whether an object is callable; that is, it can be on the left side of
  *   an application.
  *
@@ -370,6 +410,7 @@ TL_EXTERN void tl_gc(tl_interp *);
 TL_EXTERN size_t tl_list_len(tl_object *);
 TL_EXTERN tl_object *tl_list_rvs(tl_interp *, tl_object *);
 TL_EXTERN tl_object *tl_list_rvs_improp(tl_interp *, tl_object *);
+TL_EXTERN char *tl_sym_to_cstr(tl_interp *, tl_object *);
 
 /** Determine if two symbols are equal.
  *
@@ -605,6 +646,11 @@ struct tl_interp_s {
 	 * pointers stored in the interpreter.
 	 */
 	void *udata;
+	/** The next tag to return.
+	 *
+	 * This is the value next returned from ::tl_new_tag, to identify a type.
+	 */
+	tl_tag next_tag;
 	/** Function to read a character immediately.
 	 *
 	 * This is only invoked by `tl_run_until_done`, using the default handling
@@ -691,9 +737,31 @@ struct tl_interp_s {
 #endif
 };
 
+/** Set to indicate the function is `CFUNC_BYVAL` instead of `CFUNC`. */
+#define TL_EF_BYVAL 0x01
+/** Type of an initialization entry.
+ *
+ * At compilation time, a number of these entries are put into the same binary
+ * section, which the linker then merges (in a specific but unimportant order)
+ * into a region which is effectively-addressable as an array.
+ * `tl_interp_load_funcs` reads from this array, using it to populate the
+ * tl_interp::top_env in ::tl_interp_init.
+ */
+typedef struct tl_init_ent_s {
+	/** The C function to invoke. */
+	void (*fn)(tl_interp *, tl_object *, tl_object *);
+	/** The name this `CFUNC`/`CFUNC_BYVAL` should have in the environment. */
+	const char *name;
+	/** `TL_EF` constants, OR'd together. */
+	size_t flags;
+} __attribute__((aligned(8))) tl_init_ent;
+
 TL_EXTERN void tl_interp_init(tl_interp *);
 TL_EXTERN void tl_interp_init_alloc(tl_interp *, void *(*)(struct tl_interp_s *, void *, size_t));
 TL_EXTERN void tl_interp_cleanup(tl_interp *);
+TL_EXTERN tl_object *tl_interp_load_funcs(tl_interp *, tl_object *, tl_init_ent *, tl_init_ent *);
+/** Allocate a new ::tl_tag for use with ::tl_is_tag and ::tl_new_ptr. */
+#define tl_new_tag(in) ((in)->next_tag++)
 
 /** Set the error state of the interpreter.
  *
@@ -764,6 +832,9 @@ TL_EXTERN tl_object *tl_env_get_kv(tl_interp *, tl_object *, tl_object *);
 TL_EXTERN tl_object *tl_env_set_global(tl_interp *, tl_object *, tl_object *, tl_object *);
 TL_EXTERN tl_object *tl_env_set_local(tl_interp *, tl_object *, tl_object *, tl_object *);
 TL_EXTERN tl_object *tl_frm_set(tl_interp *, tl_object *, tl_object *, tl_object *);
+TL_EXTERN tl_object *tl_env_top_pair(tl_interp *);
+#define tl_env_top_frame(in) tl_first(tl_env_top_pair((in)))
+TL_EXTERN void tl_env_merge(tl_interp *, tl_object *, tl_object *);
 
 TL_EXTERN void tl_cf_macro(tl_interp *, tl_object *, tl_object *);
 TL_EXTERN void tl_cf_lambda(tl_interp *, tl_object *, tl_object *);
@@ -980,23 +1051,33 @@ static int tl_init
 
 #endif  /* ifdef MODULE */
 
-/** Set to indicate the function is `CFUNC_BYVAL` instead of `CFUNC`. */
-#define TL_EF_BYVAL 0x01
-/** Type of an initialization entry.
+#define TL_START_INIT_ENTS_NAME __start_tl_init_ents
+#define TL_STOP_INIT_ENTS_NAME __stop_tl_init_ents
+extern tl_init_ent TL_START_INIT_ENTS_NAME, TL_STOP_INIT_ENTS_NAME;
+#define TL_START_INIT_ENTS &TL_START_INIT_ENTS_NAME
+#define TL_STOP_INIT_ENTS &TL_STOP_INIT_ENTS_NAME
+
+/** Define a ::tl_init_ent .
  *
- * At compilation time, a number of these entries are put into the same binary
- * section, which the linker then merges (in a specific but unimportant order)
- * into a region which is effectively-addressable as an array. `tl_interp_init`
- * reads from this array, using it to populate the tl_interp::top_env.
+ * This has the effect of asking the linker to add a "variable" named
+ * `init_tl_cf_`*nm* to the `tl_init_ents` section. On GNU and LLVM linkers,
+ * this results in a symbol called __start_tl_init_ents and __stop_tl_init_ents
+ * pointing to the first and just past the end of all variables assembled
+ * there, allowing them to be loaded as an array into ::tl_interp_load_funcs.
+ *
+ * By using this macro, you will have this section in your binary. If you are
+ * linking statically against TL, all such entries will be automatically loaded
+ * into any interpreter by way of ::tl_interp_init. (See, e.g., `main.c`, which
+ * adds some utility functions to the basic REPL that are available in this
+ * manner.) If you are linking dynamically, you may need some linker-specific
+ * calls to extract these sections from the shared object, and they won't
+ * automatically be called on interpreter init (since loads can happen much
+ * later). If you're authoring TL modules, a fine time to load these is in the
+ * function declared by ::TL_MOD_INIT .
+ *
+ * Use ::tl_interp_load_funcs with the pointers to these sections to load the
+ * entries. (This is ultimately what ::tl_interp_init does.)
  */
-typedef struct tl_init_ent_s {
-	/** The C function to invoke. */
-	void (*fn)(tl_interp *, tl_object *, tl_object *);
-	/** The name this `CFUNC`/`CFUNC_BYVAL` should have in the environment. */
-	const char *name;
-	/** `TL_EF` constants, OR'd together. */
-	size_t flags;
-} __attribute__((aligned(8))) tl_init_ent;
 #define TL_CF_FLAGS(func, nm, f) void tl_cf_##func(tl_interp *, tl_object *, tl_object *);\
 static tl_init_ent __attribute__((section("tl_init_ents"),aligned(8),used)) init_tl_cf_##func = {\
 	.fn = tl_cf_##func, .name = "tl-" nm, .flags = (f),\
@@ -1008,9 +1089,9 @@ void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
  *
  * This macro expands to a prototype, a declaration, and the beginning of a
  * function definition, such that it is suitable to follow by a function body
- * in a brace block. The arguments are declared as follows:
+ * in a brace block. The name and arguments are declared as follows:
  *
- *		`(tl_interp *in, tl_object *args, tl_object *_)`
+ *		`void tl_cf_`*nm*`(tl_interp *in, tl_object *args, tl_object *_)`
  *
  * (The `_` argument is a "state" argument, which is always `NULL` for
  * non-continuations, but a necessary part of the function type.)

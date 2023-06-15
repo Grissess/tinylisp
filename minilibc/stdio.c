@@ -1,4 +1,5 @@
 #include "stdio.h"
+#include "string.h"
 #include "arch.h"
 
 #include <stdarg.h>
@@ -35,6 +36,22 @@ size_t fwrite(const void *p, size_t s, size_t n, FILE *f) {
 	while(n--) for(c = 0; c < s; c++) arch_fputc((unsigned long) f, *d++);
 	return r;
 }
+
+size_t fread(void *p, size_t s, size_t n, FILE *f) {
+	size_t c, r = n;
+	unsigned char *d = p;
+	while(n--) for(c = 0; c < s; c++) *d++ = arch_fgetc((unsigned long) f);
+	return r;
+}
+
+FILE *fopen(const char *name, const char *mode) {
+	if(!strcmp(name, "/dev/stdin") && *mode == 'r') return stdin;
+	if(!strcmp(name, "/dev/stdout") && *mode == 'w') return stdout;
+	if(!strcmp(name, "/dev/stderr") && *mode == 'w') return stderr;
+	return NULL;
+}
+
+int fclose(FILE *fp) { return 0; }
 
 #define VXP_NAME vsnprintf
 #define VXP_ARGS char *s, size_t sz,

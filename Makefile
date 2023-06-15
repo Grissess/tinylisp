@@ -128,6 +128,12 @@ Preprocessor configuration:
 		using the libc getchar() function, to more
 		faithfully emulate asynchronous input targets.
 
+	-DLOAD_DEBUG
+		Function load debugging; prints out when the TL_INIT_ENTS are
+		traversed, which usually contain built-in functions. This normally
+		happens once during interpreter init, but also happens during module
+		load, and can be useful to see which modules affect the environment.
+
 - Platform macros:
 	These macros usually express configuration options that
 	may not be available on all platforms. Some platforms will force options
@@ -180,7 +186,7 @@ endif
 
 ifneq ($(USE_MINILIBC),)
 	CFLAGS += -Iminilibc -nostdlib -static
-	OBJ += $(patsubst %,minilibc/%.o,string stdio assert stdlib ctype unistd)
+	OBJ += $(patsubst %,minilibc/%.o,string stdio assert stdlib ctype unistd errno)
 	MINILIBC_ARCH ?= linsys
 	MINILIBC_MK := minilibc/arch/$(MINILIBC_ARCH).mk
 ifeq ($(V),0)

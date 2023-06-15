@@ -158,6 +158,44 @@ tl_object *tl_new_cont(tl_interp *in, tl_object *env, tl_object *conts, tl_objec
 	return obj;
 }
 
+/** Creates a new pointer object.
+ *
+ * These objects are thin wrappers around a C pointer, generally opaque to the
+ * interpreter and its language. They're primarily for extension developers to
+ * embed application-specific data as values that can be manipulated as a TL
+ * value: passed to functions, stored in lists, etc.
+ *
+ * The tag is stored in the tag field. You can allocate a tag for your own
+ * usage (with ::tl_is_tag) using ::tl_new_tag, or you can use the reserved
+ * ::TL_NO_TAG if you don't care about it. It has no semantic meaning beyond
+ * this use.
+ *
+ * Note that TinyLISP can easily retain values indefinitely; garbage-collection
+ * is only done when ::tl_gc is called, normally via tl_interp::gc_events .
+ * Beside that, objects can be retained in surprising ways, such as the frames
+ * captured by a continuation which is itself still reachable. Surrendering
+ * this pointer to the runtime may well require that you ensure it stays alive
+ * for potentially the lifetime of the entire interpreter. The only time it is
+ * safe to completely free its referent is in the callback given, which is
+ * invoked from ::tl_free . (Don't free the object itself in this callback,
+ * only the pointer it contains.)
+ *
+ * Storing TinyLISP values inside of a pointer, even indirectly, is a bad idea;
+ * there is no public-facing routine for allowing the GC mark pass to view
+ * inside of this pointer, and so it may eventually contain dangling
+ * references. If you want to expose multiple TL values, construct a list (see
+ * ::tl_new_pair ). Lists can safely contain pointer objects, and are
+ * compatible with GC.
+ */
+tl_object *tl_new_ptr(tl_interp *in, void *ptr, void (*gcfunc)(tl_interp *, tl_object *), tl_tag tag) {
+	tl_object *obj = tl_new(in);
+	obj->kind = TL_PTR;
+	obj->ptr = ptr;
+	obj->gcfunc = gcfunc;
+	obj->tag = tag;
+	return obj;
+}
+
 /** Free an object.
  *
  * TinyLISP has a tracing GC, so, as a rule, you should never need to do this.
@@ -191,6 +229,10 @@ void tl_free(tl_interp *in, tl_object *obj) {
 			tl_alloc_free(in, obj->name);
 			break;
 
+		case TL_PTR:
+			if(obj->gcfunc) obj->gcfunc(in, obj);
+			break;
+
 		default:
 			break;
 	}
@@ -210,6 +252,7 @@ static void _tl_mark_pass(tl_object *obj) {
 	switch(obj->kind) {
 		case TL_INT:
 		case TL_SYM:
+		case TL_PTR:
 			break;
 
 		case TL_CFUNC:
@@ -362,4 +405,21 @@ void *tl_calloc(tl_interp *in, size_t n, size_t s) {
 	void *region = tl_alloc_malloc(in, n * s);
 	if(!region) return NULL;
 	return memset(region, 0, n * s);
+}
+
+/** Return a C string containing the symbol's name.
+ *
+ * This is allocated with the interpreter allocator, and needs to be freed with
+ * ::tl_alloc_free . It's not tracked or GC'd otherwise; a fresh copy is
+ * returned.
+ *
+ * On a failure, this returns NULL.
+ */
+char *tl_sym_to_cstr(tl_interp *in, tl_object *sym) {
+	if(!tl_is_sym(sym)) return NULL;
+	void *region = tl_alloc_malloc(in, sym->nm->here.len + 1);
+	if(!region) return NULL;
+	memcpy(region, sym->nm->here.data, sym->nm->here.len);
+	((char *)region)[sym->nm->here.len] = 0;
+	return region;
 }

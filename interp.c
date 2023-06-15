@@ -1,6 +1,5 @@
 #include "tinylisp.h"
 
-extern tl_init_ent __start_tl_init_ents, __stop_tl_init_ents;
 /** An internal macro for creating a new binding inside of a frame. */
 #define _tl_frm_set(sm, obj, fm) tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, sm), obj), fm)
 
@@ -80,25 +79,47 @@ void tl_interp_init_alloc(tl_interp *in, void *(*reallocf)(tl_interp *, void *, 
 	in->is_putback = 0;
 	in->read_buffer = NULL;
 	in->disp_sep = '\t';
+	in->next_tag = 1;
 
 	in->top_env = TL_EMPTY_LIST;
 
 	tl_object *top_frm = TL_EMPTY_LIST;
-	tl_init_ent *current = &__start_tl_init_ents;
 	top_frm = _tl_frm_set("tl-#t", in->true_, top_frm);
 	top_frm = _tl_frm_set("tl-#f", in->false_, top_frm);
 
-	while(current != &__stop_tl_init_ents) {
-		top_frm = _tl_frm_set(
-				current->name,
-				current->flags & TL_EF_BYVAL ? _tl_new_cfunc_byval(in, current->fn, current->name) : _tl_new_cfunc(in, current->fn, current->name),
-				top_frm
-		);
-		current++;
-	}
+	top_frm = tl_interp_load_funcs(in, top_frm,
+			TL_START_INIT_ENTS,
+			TL_STOP_INIT_ENTS
+	);
 
 	in->top_env = tl_new_pair(in, top_frm, in->top_env);
 	in->env = in->top_env;
+}
+
+/** Load functions from ::tl_init_ent entries.
+ *
+ * This is most often done from a linker-defined section. (See the definition
+ * of ::TL_CF_FLAGS , which is invoked by ::TL_CF and ::TL_CFBV .)
+ */
+tl_object *tl_interp_load_funcs(tl_interp *in, tl_object *frame, tl_init_ent *start, tl_init_ent *stop) {
+#ifdef LOAD_DEBUG
+	fprintf(stderr, "Load starts from %p to %p:\n", start, stop);
+#endif
+	while(start != stop) {
+#ifdef LOAD_DEBUG
+		fprintf(stderr, "Loading %s %s from %p...\n", start->flags & TL_EF_BYVAL ? "cfunc_byval" : "cfunc", start->name, start->fn);
+#endif
+		frame = _tl_frm_set(
+				start->name,
+				start->flags & TL_EF_BYVAL ? _tl_new_cfunc_byval(in, start->fn, start->name) : _tl_new_cfunc(in, start->fn, start->name),
+				frame
+		);
+		start++;
+	}
+#ifdef LOAD_DEBUG
+	fprintf(stderr, "Load complete.\n");
+#endif
+	return frame;
 }
 
 /** Finalizes a module.

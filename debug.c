@@ -82,6 +82,12 @@ void tl_dbg_print(tl_object *obj, int level) {
 			*/
 			break;
 
+		case TL_PTR:
+			fprintf(stderr, "PTR:%p\n", obj->ptr);
+			_indent(level + 1);
+			fprintf(stderr, "gcfunc:%p\n", obj->gcfunc);
+			break;
+
 		default:
 			fprintf(stderr, "!!! UNKNOWN OBJECT KIND %d\n", obj->kind);
 			break;

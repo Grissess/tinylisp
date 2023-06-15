@@ -88,6 +88,10 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 			tl_printf(in, "cont:%p", obj);
 			break;
 
+		case TL_PTR:
+			tl_printf(in, "ptr:%p", obj->ptr);
+			break;
+
 		default:
 			tl_printf(in, "<unknown object kind %d>", obj->kind);
 			break;

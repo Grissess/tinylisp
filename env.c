@@ -50,3 +50,19 @@ tl_object *tl_frm_set(tl_interp *in, tl_object *frm, tl_object *nm, tl_object *v
 	}
 	return tl_new_pair(in, tl_new_pair(in, nm, val), frm);
 }
+
+tl_object *tl_env_top_pair(tl_interp *in) {
+	tl_object *frm = NULL;
+	for(tl_list_iter(in->env, kv)) {
+		frm = l_kv;
+	}
+	return frm;
+}
+
+void tl_env_merge(tl_interp *in, tl_object *pair, tl_object *frame) {
+	if(!tl_is_pair(pair)) return;
+	while(frame) {
+		pair->first = tl_new_pair(in, tl_first(frame), tl_first(pair));
+		frame = tl_next(frame);
+	}
+}
