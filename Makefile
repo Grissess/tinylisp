@@ -175,7 +175,7 @@ Preprocessor configuration:
 		$(CFLAGS)
 endef
 
-ALL_MODULES = io
+ALL_MODULES = io mem
 MODULES ?= all
 MODULES_BUILTIN ?=
 CFLAGS += -D$(PLAT)
