@@ -53,7 +53,7 @@ TL_CFBV(ptr_read, "ptr-read") {
 	tl_cfunc_return(in, tl_new_sym_data(in, ptr->ptr, amt->ival));
 }
 
-TL_CFBV(ptr_write, "ptr-write") {
+TL_CFBV(ptr_write, "ptr-write!") {
 	tl_object *ptr = tl_first(args);
 	tl_object *data = tl_first(tl_next(args));
 	if(!(tl_is_tag(ptr, PTR_TAG) && tl_is_sym(data))) {
