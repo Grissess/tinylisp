@@ -180,6 +180,8 @@ MODULES ?= all
 MODULES_BUILTIN ?=
 CFLAGS += -D$(PLAT)
 
+polyfill = -Iminilibc/polyfill/$(1)
+
 ifeq ($(MODULES),all)
 	MODULES := $(ALL_MODULES)
 endif
@@ -314,6 +316,8 @@ quiet_so = CC(SO)\t$@
 cmd_o = $(CC) $(CFLAGS) -o "$@" -c "$<"
 quiet_o = CC\t$@
 %.o: %.c
+	$(call cmd,o)
+%.o: %.s
 	$(call cmd,o)
 
 define cmd_initscript

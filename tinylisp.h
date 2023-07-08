@@ -35,6 +35,8 @@
 #endif
 
 #if defined(MODULE) && !defined(MODULE_BUILTIN)
+#define TL_EXTERN extern
+#else
 /** `extern` keyword used throughout the header
  *
  * This is set to `extern` whenever the current source (.c) file is being
@@ -42,8 +44,6 @@
  * in this library are external (because they are in the interpreter which
  * loads them). It is defined as an empty string otherwise.
  */
-#define TL_EXTERN extern
-#else
 #define TL_EXTERN
 #endif
 
@@ -1108,6 +1108,22 @@ void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
  * avoided, including for nilary functions (with no expected arguments).
  */
 #define TL_CFBV(func, nm) TL_CF_FLAGS(func, nm, TL_EF_BYVAL)
+
+#if defined(MODULE) && !defined(MODULE_BUILTIN)
+#define TL_LOAD_FUNCS do { \
+	tl_object *frm = NULL; \
+	frm = tl_interp_load_funcs(in, frm, TL_START_INIT_ENTS, TL_STOP_INIT_ENTS); \
+	tl_env_merge(in, tl_env_top_pair(in), frm); \
+} while(0)
+#else
+/** Load the `TL_CF` and `TL_CFBV` entries.
+ *
+ * Call this from `TL_MOD_INIT`. If the module is linked externally, this
+ * merges the environment. If it's statically linked, this does nothing--the
+ * entries would've been loaded by ::tl_interp_init anyway.
+ */
+#define TL_LOAD_FUNCS
+#endif
 
 #define tl_min(x, y) ((x) < (y) ? (x) : (y))
 

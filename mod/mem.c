@@ -8,9 +8,7 @@ static tl_tag PTR_TAG;
 
 TL_MOD_INIT(tl_interp *in, const char *fname) {
 	PTR_TAG = tl_new_tag(in);
-	tl_object *frm = NULL;
-	frm = tl_interp_load_funcs(in, frm, TL_START_INIT_ENTS, TL_STOP_INIT_ENTS);
-	tl_env_merge(in, tl_env_top_pair(in), frm);
+	TL_LOAD_FUNCS;
 	return 1;
 }
 

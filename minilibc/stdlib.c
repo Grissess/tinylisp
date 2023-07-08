@@ -178,8 +178,8 @@ void *malloc(size_t b) {
 	}
 
 	if(!arena) {
-		size_t s;
-		void *root;
+		size_t s = 0;
+		void *root = NULL;
 		arch_new_heap(b + MIN_HEADER_SIZE, &root, &s);
 		if(!root) {
 #ifdef MEM_DEBUG
