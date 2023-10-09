@@ -118,6 +118,12 @@ Preprocessor configuration:
 		memory allocator, including every call to malloc()
 		and free().
 
+	-DMEM_INSPECT
+		Memory inspection; if USE_MINILIBC=1, this adds the meminfo
+		routine, which returns some information about the memory
+		allocator (which adds a little overhead to each allocation),
+		and the tl-meminfo builtin for viewing it from the REPL.
+
 	-DGC_DEBUG
 		Garbage collector debugging; prints out large
 		amounts of information about every collector run,
@@ -174,6 +180,7 @@ Preprocessor configuration:
 	Your current CFLAGS, which include DEFINES, are:
 		$(CFLAGS)
 endef
+export help_text
 
 ALL_MODULES = io mem
 MODULES ?= all
@@ -260,7 +267,7 @@ showconfig:
 	$(call cmd,showconfig)
 
 help:
-	@printf "$(subst $(newline),\n,$(help_text))\n"
+	@echo "$$help_text"
 
 cmd_run = cat std.tl - | $(DEBUGGER) ./$(INTERPRETER)
 quiet_run = RUN

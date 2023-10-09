@@ -8,4 +8,16 @@ void free(void *);
 void *realloc(void *, size_t);
 void exit(int);
 
+#ifdef MEM_INSPECT
+struct meminfo {
+	size_t size;
+	size_t used;
+	size_t allocated;
+};
+
+int meminfo(size_t, struct meminfo *);
+
+#define HAS_MEMINFO
+#endif
+
 #endif

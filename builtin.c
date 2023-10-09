@@ -517,3 +517,21 @@ TL_CFBV(all_objects, "all-objects") {
 	}
 	tl_cfunc_return(in, res);
 }
+
+#ifdef HAS_MEMINFO
+
+TL_CFBV(meminfo, "meminfo") {
+	struct meminfo minfo;
+
+	arity_1(in, args, "meminfo");
+	tl_object *idx = tl_first(args);
+	verify_type(in, idx, int, "meminfo");
+
+	if(meminfo((size_t) idx->ival, &minfo)) {
+		tl_cfunc_return(in, tl_new_pair(in, tl_new_int(in, minfo.size), tl_new_pair(in, tl_new_int(in, minfo.used), tl_new_pair(in, tl_new_int(in, minfo.allocated), TL_EMPTY_LIST))));
+	} else {
+		tl_cfunc_return(in, in->false_);
+	}
+}
+
+#endif

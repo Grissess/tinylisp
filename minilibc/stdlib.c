@@ -48,6 +48,9 @@ struct freelist {
 #if defined(MEM_DEBUG) || defined(NO_MEM_PACK)
 	char is_used;
 #endif
+#ifdef MEM_INSPECT
+	size_t alloc;
+#endif
 };
 
 struct arena {
@@ -56,6 +59,10 @@ struct arena {
 	struct arena *next;
 #ifdef MEM_DEBUG
 	struct freelist *sentinel;
+#endif
+#ifdef MEM_INSPECT
+	size_t used;
+	size_t allocated;
 #endif
 } *alist = NULL;
 
@@ -162,6 +169,11 @@ void *malloc_in_arena(struct arena *arena, size_t b) {
 	fprintf(stderr, "malloc: gave %p of %p bytes from arena %p root %p sz %p, next is %p (%s) (%p away) with %p, nextfree is %p with %p, fr is %p sz %p\n", area, b, arena, cur, old, next, split ? "split" : "not split", ((char *) next) - ((char *) cur), fl_size(next), nf, fl_size(nf), arena->freeroot, fl_size(arena->freeroot));
 	mem_sanity(arena);
 #endif
+#ifdef MEM_INSPECT
+	arena->used += split ? b + sizeof(struct freelist) : old;
+	arena->allocated += b;
+	cur->alloc = b;
+#endif
 
 	return area;
 }
@@ -238,6 +250,11 @@ void free(void *area) {
 	fprintf(stderr, "free: ... size %p, %s, arena %p, next %p, nf %p, pf %p\n", fl_size(fl), fl_used(fl) ? "used" : "NOT USED", fl->arena, fl_next(fl), fl->nextfree, fl->prevfree);
 #endif
 
+#ifdef MEM_INSPECT
+	fl->arena->used -= fl_size(fl);
+	fl->arena->allocated -= fl->alloc;
+#endif
+
 	fl_set_unused(fl);
 	while(fl_next(fl) && fl_next(fl_next(fl)) && !fl_used(fl_next(fl))) {
 		/* Unlink from freelist */
@@ -253,6 +270,9 @@ void free(void *area) {
 		/* And coalesce the area */
 		fl->next = fl_make_next(fl, fl_next(fl_next(fl)));
 		i++;
+#ifdef MEM_INSPECT
+		fl->arena->used -= sizeof(struct freelist);
+#endif
 	}
 
 	fl->nextfree = fl->arena->freeroot;
@@ -288,6 +308,28 @@ void *realloc(void *ptr, size_t n) {
 	memcpy(new, ptr, sz);
 	return new;
 }
+
+#ifdef MEM_INSPECT
+
+int meminfo(size_t index, struct meminfo *minfo) {
+	struct arena *arena = alist;
+
+	if(!minfo) return 0;
+
+	while(arena && index) {
+		arena = arena->next;
+		index--;
+	}
+	if(!arena) return 0;
+
+	minfo->size = arena->size;
+	minfo->used = arena->used;
+	minfo->allocated = arena->allocated;
+
+	return 1;
+}
+
+#endif
 
 void exit(int status) {
 	fprintf(stderr, "exit: program called exit() with status %d\n", status);
