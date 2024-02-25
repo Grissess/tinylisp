@@ -34,7 +34,7 @@
 #endif
 #endif
 
-#if defined(MODULE) && !defined(MODULE_BUILTIN)
+#if defined(SHARED_LIB) || (defined(MODULE) && !defined(MODULE_BUILTIN))
 #define TL_EXTERN extern
 #else
 /** `extern` keyword used throughout the header

@@ -1,5 +1,6 @@
 *.o
 *.so
+*.a
 tl
 tl.*
 ns_test
@@ -7,3 +8,4 @@ a.out
 *.tar.xz
 /doc_html
 /doxyxml
+cscope*
