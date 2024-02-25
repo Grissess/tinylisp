@@ -372,13 +372,13 @@ clean:
 	$(call cmd,clean)
 
 define cmd_install
-	install -D -t $(BINPATH) $(INTERPRETER)
-	install -D -t $(LIBPATH) $(LIBTARGET)
-	install -D -t $(LIBPATH)/tl/mod/ $(MODULES)
-	install -D -t $(DATAPATH)/tl/ std.tl
+	install -D -t "$(BINPATH)" "$(INTERPRETER)"
+	$(Q)install -D -t "$(LIBPATH)" "$(LIBTARGET)"
+	$(Q)install -D -t "$(LIBPATH)/tl/mod/" $(MODULE_OBJECTS)
+	$(Q)install -D -t "$(DATAPATH)/tl/" std.tl
 endef
 quiet_install = INSTALL
-install: $(INTERPRETER) $(LIBTARGET) $(MODULES) std.tl
+install: $(INTERPRETER) $(LIBTARGET) $(MODULE_OBJECTS) std.tl
 	$(call cmd,install)
 
 cmd_tl = $(CC) $(CFLAGS) $(call intolink,$^) $(LDFLAGS) -o $@
