@@ -109,7 +109,7 @@ tl_object *tl_interp_load_funcs(tl_interp *in, tl_object *frame, tl_init_ent *st
 #endif
 	while(start != stop) {
 #ifdef LOAD_DEBUG
-		fprintf(stderr, "Loading %s %s from %p...\n", start->flags & TL_EF_BYVAL ? "cfunc_byval" : "cfunc", start->name, start->fn);
+		fprintf(stderr, "Loading %s %s declared in %s:%u from %p...\n", start->flags & TL_EF_BYVAL ? "cfunc_byval" : "cfunc", start->name, start->file, start->line, start->fn);
 #endif
 		frame = _tl_frm_set(
 				start->name,

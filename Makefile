@@ -24,6 +24,7 @@ endef
 define tab
 	
 endef
+comma := ,
 
 define help_text
 Type 'make' (or make -jN, for N parallel jobs) to make TinyLISP.
@@ -297,7 +298,7 @@ else
 $(INTERPRETER): LDFLAGS += -L.
 endif
 
-intolink = $(patsubst lib%.so,-l%,$(patsubst lib%.a,-l%,$(1)))
+intolink = $(patsubst lib%.so,-l%,$(patsubst lib%.a,-Wl$(comma)--whole-archive -l% -Wl$(comma)--no-whole-archive,$(1)))
 
 Q := @
 quiet := cmd_

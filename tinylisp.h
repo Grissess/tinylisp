@@ -754,6 +754,10 @@ typedef struct tl_init_ent_s {
 	const char *name;
 	/** `TL_EF` constants, OR'd together. */
 	size_t flags;
+	/** The file in which this was declared. */
+	const char *file;
+	/** The line in which this was declared. */
+	unsigned line;
 } __attribute__((aligned(8))) tl_init_ent;
 
 TL_EXTERN void tl_interp_init(tl_interp *);
@@ -1083,6 +1087,7 @@ static int tl_init
 #define TL_CF_FLAGS(func, nm, f) void tl_cf_##func(tl_interp *, tl_object *, tl_object *);\
 static tl_init_ent __attribute__((section("tl_init_ents"),aligned(8),used)) init_tl_cf_##func = {\
 	.fn = tl_cf_##func, .name = "tl-" nm, .flags = (f),\
+	.file = __FILE__, .line = __LINE__,\
 };\
 void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
 /** Declare a CFUNC.

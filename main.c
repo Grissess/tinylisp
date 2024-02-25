@@ -236,7 +236,7 @@ int main(int argc, char **argv) {
 #else
 	in.readf = _input_readf;
 #endif
-#if defined(STATIC_LIB) || defined(SHARED_LIB)
+#ifdef SHARED_LIB
 	{
 		TL_DECLARE_INIT_ENTS;
 		tl_object *frm = TL_EMPTY_LIST;
