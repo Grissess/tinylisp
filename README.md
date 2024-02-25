@@ -14,6 +14,13 @@ entire external interface (as defined in the `tl_interp` structure) consists
 only of a function to read a character, put a character back to be read again,
 and an output function similar to libc's `printf`.
 
+Building
+--------
+
+`make help` in the repository root prints out a plethora of build information.
+It's more up-to-date than this README; read it carefully, and type `make` when
+you're ready.
+
 Running
 -------
 
@@ -25,6 +32,12 @@ Running
 LISP functionality. It is worth noting that the majority of TinyLISP's language
 is implemented in itself, using its powerful metaprogramming capabilities;
 refer to the language specification in the documentation.
+
+As of late, on UNIX, the above can be emulated as
+
+	$(DEBUGGER) ./tl std.tl
+
+but the former syntax works as well.
 
 Embedding
 ---------
