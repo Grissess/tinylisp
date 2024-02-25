@@ -1051,11 +1051,13 @@ static int tl_init
 
 #endif  /* ifdef MODULE */
 
-#define TL_START_INIT_ENTS_NAME __start_tl_init_ents
-#define TL_STOP_INIT_ENTS_NAME __stop_tl_init_ents
-extern tl_init_ent TL_START_INIT_ENTS_NAME, TL_STOP_INIT_ENTS_NAME;
-#define TL_START_INIT_ENTS &TL_START_INIT_ENTS_NAME
-#define TL_STOP_INIT_ENTS &TL_STOP_INIT_ENTS_NAME
+#define TL_INIT_ENTS_SECTION_NAME tl_init_ents
+#define TL_CONCAT(a, b) a##b
+#define TL_START_SEC_SYM(name) TL_CONCAT(__start_, name)
+#define TL_STOP_SEC_SYM(name) TL_CONCAT(__stop_, name)
+#define TL_DECLARE_INIT_ENTS extern tl_init_ent TL_START_SEC_SYM(TL_INIT_ENTS_SECTION_NAME), TL_STOP_SEC_SYM(TL_INIT_ENTS_SECTION_NAME)
+#define TL_START_INIT_ENTS &TL_START_SEC_SYM(TL_INIT_ENTS_SECTION_NAME)
+#define TL_STOP_INIT_ENTS &TL_STOP_SEC_SYM(TL_INIT_ENTS_SECTION_NAME)
 
 /** Define a ::tl_init_ent .
  *
@@ -1111,7 +1113,8 @@ void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
 
 #if defined(MODULE) && !defined(MODULE_BUILTIN)
 #define TL_LOAD_FUNCS do { \
-	tl_object *frm = NULL; \
+	TL_DECLARE_INIT_ENTS; \
+	tl_object *frm = TL_EMPTY_LIST; \
 	frm = tl_interp_load_funcs(in, frm, TL_START_INIT_ENTS, TL_STOP_INIT_ENTS); \
 	tl_env_merge(in, tl_env_top_pair(in), frm); \
 } while(0)

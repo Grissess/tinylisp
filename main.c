@@ -236,6 +236,14 @@ int main(int argc, char **argv) {
 #else
 	in.readf = _input_readf;
 #endif
+#if defined(STATIC_LIB) || defined(SHARED_LIB)
+	{
+		TL_DECLARE_INIT_ENTS;
+		tl_object *frm = TL_EMPTY_LIST;
+		frm = tl_interp_load_funcs(&in, frm, TL_START_INIT_ENTS, TL_STOP_INIT_ENTS);
+		tl_env_merge(&in, tl_env_top_pair(&in), frm);
+	}
+#endif
 #ifdef CONFIG_MODULES_BUILTIN
 	{
 		int (**fp)(tl_interp *, const char *) = (int (**)(tl_interp *, const char *))&__start_tl_bmcons;
