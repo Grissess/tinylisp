@@ -5,20 +5,44 @@
 
 #ifdef UNIX
 #include <unistd.h>
+#include <errno.h>
 #endif
 
 #include "tinylisp.h"
 
+static int _standard_readf(tl_interp *in) { return getchar(); }
+
+struct input_ent {
+	struct input_ent *next;
+	char *name;
+	FILE *input;
+} *inputs = NULL;
+
+static int _input_readf(tl_interp *in) {
+retry:
+	if(inputs) {
+		int result = fgetc(inputs->input);
+		if(result == EOF) {
+			struct input_ent *next = inputs->next;
+			free(inputs);
+			inputs = next;
+			goto retry;
+		}
+		return result;
+	} else {
+		in->readf = _standard_readf;
+		return _standard_readf(in);
+	}
+}
+
 #ifdef INITSCRIPTS
 extern char __start_tl_init_scripts, __stop_tl_init_scripts;
-
-static int _postscript_readf(tl_interp *in) { return getchar(); }
 
 static int _initscript_readf(tl_interp *in) {
 	static char *ptr = &__start_tl_init_scripts;
 	if(ptr >= &__stop_tl_init_scripts) {
-		in->readf = _postscript_readf;
-		return _postscript_readf(in);
+		in->readf = _input_readf;
+		return _input_readf(in);
 	}
 	return (int) *ptr++;
 }
@@ -180,7 +204,7 @@ extern void *__start_tl_bmcons;
 extern void *__stop_tl_bmcons;
 #endif
 
-int main() {
+int main(int argc, char **argv) {
 	tl_interp in;
 	tl_object *expr, *val;
 
@@ -190,6 +214,17 @@ int main() {
 	if(!isatty(STDIN_FILENO)) {
 		quiet = QUIET_NO_TRUE;
 	}
+
+	for(int i = 1; i < argc; i++) {
+		struct input_ent *ent = malloc(sizeof(struct input_ent));
+		ent->next = inputs;
+		inputs = ent;
+		ent->name = argv[i];
+		if(!(ent->input = fopen(argv[i], "r"))) {
+			fprintf(stderr, "%s: %s\n", argv[i], strerror(errno));
+			return 100;  // leaks, but dies immediately
+		}
+	}
 #endif
 
 	tl_interp_init(&in);
@@ -198,6 +233,8 @@ int main() {
 #endif
 #ifdef INITSCRIPTS
 	in.readf = _initscript_readf;
+#else
+	in.readf = _input_readf;
 #endif
 #ifdef CONFIG_MODULES_BUILTIN
 	{
