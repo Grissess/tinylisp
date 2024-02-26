@@ -9,6 +9,7 @@ LDFLAGS ?=
 DESTDIR ?= /usr/local/
 BINPATH ?= $(DESTDIR)/bin/
 LIBPATH ?= $(DESTDIR)/lib/
+INCPATH ?= $(DESTDIR)/include/
 DATAPATH ?= $(DESTDIR)/share/
 CC ?= gcc
 AR ?= ar
@@ -128,6 +129,10 @@ Influential variables (and their current values):
 		The path to libraries. For non-$$STATIC builds, this should be in your
 		linker's search path. Modules are installed here, too. (Note that TL
 		itself does not yet have a path search facility.
+
+	INCPATH = $(INCPATH)
+		THe path to header files. This should be in your compiler's default
+		search path.
 
 	DATAPATH = $(DATAPATH)
 		The path for platform-inspecific data. The default init script is
@@ -374,11 +379,12 @@ clean:
 define cmd_install
 	install -D -t "$(BINPATH)" "$(INTERPRETER)"
 	$(Q)install -D -t "$(LIBPATH)" "$(LIBTARGET)"
+	$(Q)install -D -t "$(INCPATH)" "tinylisp.h"
 	$(Q)install -D -t "$(LIBPATH)/tl/mod/" $(MODULE_OBJECTS)
 	$(Q)install -D -t "$(DATAPATH)/tl/" std.tl
 endef
 quiet_install = INSTALL
-install: $(INTERPRETER) $(LIBTARGET) $(MODULE_OBJECTS) std.tl
+install: $(INTERPRETER) $(LIBTARGET) $(MODULE_OBJECTS) std.tl tinylisp.h
 	$(call cmd,install)
 
 cmd_tl = $(CC) $(CFLAGS) $(call intolink,$^) $(LDFLAGS) -o $@

@@ -782,6 +782,11 @@ TL_EXTERN tl_object *tl_interp_load_funcs(tl_interp *, tl_object *, tl_init_ent 
 #define tl_error_clear(in) ((in)->error = NULL)
 /** Evaluates to whether or not the interpreter has an error state. */
 #define tl_has_error(in) ((in)->error)
+/** Reset the state of the interpreter to a "clean" state.
+ *
+ * This clears errors, continuations, and values. It's a safe start for a REPL.
+ */
+#define tl_interp_reset(in) (tl_error_clear(in), (in)->conts = (in)->values = TL_EMPTY_LIST)
 
 /** Gets a character from the interpreter's input stream.
  *
@@ -791,7 +796,8 @@ TL_EXTERN tl_object *tl_interp_load_funcs(tl_interp *, tl_object *, tl_init_ent 
  * of `TL_RESULT_GETCHAR`.
  */
 #define tl_getc(in) ((in)->is_putback ? ((in)->is_putback = 0, (in)->putback) : (in)->readf((in)))
-/** Put back a character to be read again with `tl_getc`, like `ungetc` in stdio.
+/** Put back a character to be read again with `tl_getc`, like `ungetc` in
+ * stdio.
  *
  * TinyLISP only stores one putback character at a time.
  */
