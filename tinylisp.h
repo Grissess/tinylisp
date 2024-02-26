@@ -1061,8 +1061,11 @@ static int tl_init
 
 #endif  /* ifdef MODULE */
 
-#define TL_INIT_ENTS_SECTION_NAME tl_init_ents
 #define TL_CONCAT(a, b) a##b
+#define TL_STRINGIFY(a) TL_STRINGIFY2(a)
+#define TL_STRINGIFY2(a) #a
+#define TL_PREFIX "tl-"
+#define TL_INIT_ENTS_SECTION_NAME tl_init_ents
 #define TL_START_SEC_SYM(name) TL_CONCAT(__start_, name)
 #define TL_STOP_SEC_SYM(name) TL_CONCAT(__stop_, name)
 #define TL_DECLARE_INIT_ENTS extern tl_init_ent TL_START_SEC_SYM(TL_INIT_ENTS_SECTION_NAME), TL_STOP_SEC_SYM(TL_INIT_ENTS_SECTION_NAME)
@@ -1091,8 +1094,8 @@ static int tl_init
  * entries. (This is ultimately what ::tl_interp_init does.)
  */
 #define TL_CF_FLAGS(func, nm, f) void tl_cf_##func(tl_interp *, tl_object *, tl_object *);\
-static tl_init_ent __attribute__((section("tl_init_ents"),aligned(8),used)) init_tl_cf_##func = {\
-	.fn = tl_cf_##func, .name = "tl-" nm, .flags = (f),\
+static tl_init_ent __attribute__((section(TL_STRINGIFY(TL_INIT_ENTS_SECTION_NAME)),aligned(8),used)) init_tl_cf_##func = {\
+	.fn = tl_cf_##func, .name = TL_PREFIX nm, .flags = (f),\
 	.file = __FILE__, .line = __LINE__,\
 };\
 void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
@@ -1122,7 +1125,7 @@ void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
  */
 #define TL_CFBV(func, nm) TL_CF_FLAGS(func, nm, TL_EF_BYVAL)
 
-#if defined(MODULE) && !defined(MODULE_BUILTIN)
+#ifndef MODULE_BUILTIN
 #define TL_LOAD_FUNCS do { \
 	TL_DECLARE_INIT_ENTS; \
 	tl_object *frm = TL_EMPTY_LIST; \
