@@ -1,0 +1,20 @@
+Source: tinylisp
+Section: devel
+Priority: optional
+Maintainer: Grissess <grissess@nexusg.org>
+Build-Depends: debhelper-compat (= 13), gcc, make
+Standards-Version: 4.6.0
+Homepage: https://github.com/Grissess/tinylisp
+#Vcs-Browser: https://salsa.debian.org/debian/tinylisp
+#Vcs-Git: https://salsa.debian.org/debian/tinylisp.git
+Rules-Requires-Root: no
+
+Package: tinylisp
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A tiny LISP interpreter in <1.5kloc of ANSI C
+ TinyLISP is a simple LISP interpreter library and executable inspired by
+ Abelson, Sussman and Sussman's Structure and Interpretation of Computer
+ Programs (SICP). As a simple C implementation of an interpreter, a major focus
+ is on portability, and it has been successfully ported everywhere from
+ circuit-level RISC-V emulations to x86 bootloaders.
