@@ -109,7 +109,7 @@ Influential variables (and their current values):
 		Initscripts that will be run for tl (specifically,
 		not other embedders) before any user input is
 		processed. Scripts will be embedded and run in
-		exactly the specified order.
+		exactly the specified order, before command line arguments.
 
 	V = $(V)
 		Build verbosity:
@@ -280,8 +280,8 @@ endif
 
 ifneq ($(INITSCRIPTS),)
 	INITSCRIPT_OBJ += $(addsuffix .o,$(INITSCRIPTS))
-	OBJ += $(INITSCRIPT_OBJ)
-	CFLAGS += -DINITSCRIPTS="$(INITSCRIPTS)"
+	APPOBJ += $(INITSCRIPT_OBJ)
+$(APPOBJ): CFLAGS += -DINITSCRIPTS="$(INITSCRIPTS)"
 endif
 
 ifeq ($(STATIC),)
