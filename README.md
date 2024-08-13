@@ -14,6 +14,13 @@ entire external interface (as defined in the `tl_interp` structure) consists
 only of a function to read a character, put a character back to be read again,
 and an output function similar to libc's `printf`.
 
+The implementation is written in standards compliant C (ideally ANSI C,
+although some LLVM- and GNU-specific areas are in architecture-specific areas),
+and should be portable to other compilers that adhere to these standards. The
+basic executable should be usable wherever a POSIX-compliant libc (threading
+not required) is available. Special configurations may introduce special
+compilation requirements; see especially [Small Systems](#Small_Systems) below.
+
 Running
 -------
 
@@ -26,6 +33,9 @@ LISP functionality. It is worth noting that the majority of TinyLISP's language
 is implemented in itself, using its powerful metaprogramming capabilities;
 refer to the language specification in the documentation.
 
+Many variations are possible; run `make help` to get a full list of influential
+variables and their documentation.
+
 Embedding
 ---------
 
@@ -34,6 +44,68 @@ In general, the major interface will be the pair `tl_eval_and_then` to
 initialize the evaluation of an expression, followed by `tl_run_until_done` to
 crank the interpreter until the final continuation is called.
 
+On ELF systems, TL supports `INITSCRIPTS`, embedded binary data that contains
+programs that are "read from input" initially. This may be useful to set up a
+standard environment in embedded applications. See the [Makefile](Makefile) for
+further details.
+
+Modules
+-------
+
+TinyLISP can be augmented with loadable modules, provided a suitable dynamic
+linker interface exists. The default on Unix-like systems is to assume `dlopen`
+and `dlsym` are functional. See [main.c](main.c) for the responsibilities of
+the loading function.
+
+Modules, in [mod](mod/), are not counted toward TinyLISP's line count. They do,
+however, show how one could implement additional functionality, such as more
+general transput and memory-handling capabilities. More libraries are subject
+to be added at any time.
+
+Small Systems
+-------------
+
+TinyLISP has an embedded "minilibc", which contains exactly enough libc to
+allow TL to run, based on five interface functions defined in
+[arch.h](minilibc/arch.h): file operations (read, write, flush), memory
+operations (get heap, release heap), and halt. This interface is designed to be
+intentionally simple to implement--in particular, heaps can be large and are
+suballocated, and no assumptions are made about file descriptors other than 0,
+1, or 2 (standard in, out, and error).
+
+To use it, pass `USE_MINILIBC=1` to a `make` invocation, optionally passing
+`MINILIBC_ARCH=` one of the choices below.
+
+- `linsys`: Uses Linux x64 system calls directly. Aside from testing purposes,
+  the resulting binary has no dynamic dependencies--it is "statically linked".
+
+- `wasm`: Compiles to WASM. This feature usually requires `CC=clang`. The
+  resulting module has [a few extra symbols](minilibc/arch/wasm.c) intended to
+  help embedding. Additionally, no bit packing is done. All the interface
+  functions are imported, but `fgetc` is generally advised against on JS
+  platforms that don't support blocking (such as the Web APIs), so
+  `tl_apply_next` should be used directly instead. An example implementation is
+  in [the `wasm` directory](wasm/), which can be used if this repository is
+  served from a standard HTTP server.
+
+- `rv32im`: A RISC-V RV32IM image is built. This is designed to be hosted in
+  the RISC-V SoC in
+  [Logisim-evolution](https://github.com/logisim-evolution/logisim-evolution).
+  A basic memory map is:
+	- 0x000_000 - 0x100_000: ROM, text sections and rodata loaded by the ELF;
+	- 0x100_000 - 0x300_000: a "JTAG"-like interface
+	- 0x300_000 - (0x300_000 + MEM_SIZE (default 0x100_000)): RAM
+  These are the defaults, but can be overridden by adding to `DEFINES`. See
+  [rv32im.c](minilibc/arch/rv32im.c) for details.
+
+Other implementations are welcome to be added!
+
+`minilibc` is not designed to be performant nor standards-compliant, and is not
+counted toward TinyLISP's own line counts. However, it is implemented in much
+the same brevity as TinyLISP, and thus can serve as a didactic example of libc
+internals. In particular, it defines many `printf` variants and a functional
+`malloc` based on the K&R malloc, but with adjacent region merging.
+
 Language
 --------
 
@@ -41,7 +113,12 @@ Language
 
 - `"` (double quote) bounds a symbol, which may contain any character other than `"`;
 - `()` (parentheses) bound a proper list of lexemes;
+  - ... except that a `. DATUM )` at the end of a list creates an improper
+  	list; in particular `(A . B)` is a standard `cons` pair. Nowhere else is
+  	`.` special, and it is treated as a symbol in those places.
 - all digits introduce decimal numbers;
+- whitespace terminates lexemes, including symbols, and is skipped;
+- `;` and everything following it until newline is ignored (as comments);
 - every other character represents itself within a symbol.
 
 There is one caveat: at runtime, a TinyLISP program may introduce "prefices"
@@ -109,6 +186,30 @@ an in-code distinction between syntactic and direct values; for example:
 understood that 2 is a direct (non-syntactic) value. Because `define` expects a
 syntax to capture, the interpreter throws an error and abandons the evaluation.
 
+The general rule for language users is as follows: if you expect a real value,
+use `lambda`; if you expect syntax, use `macro`. For example, `2`, `(begin 2)`,
+`((lambda () 2))`, and `(+ 1 1)` are several different syntaxes that all result
+in the same direct value (`2`). In the mixed case where some arguments need to
+be syntactic (using `define` as a prototypal example), use a `macro` to capture
+syntax, and selectively use `tl-eval-in&` or variants to convert some syntax to
+values.
+
+TL macros are more general than some other implementations of "macros" that are
+only allowed to rewrite syntax. A common idiom for implementing those macros in
+TL is:
+
+```
+(define example (macro (arg) env (tl-eval-in env `( ... ))))
+```
+
+where `...` is the syntactic translation, using the appropriate `quasiquote`
+macros. But, of course, macros are not so restricted--they can implement
+arbitrary functionality, including invoking other macros. This can be used for
+advanced features, such as lazy evaluation.
+
+In short, the TL evaluator is a "Call by Push Value" (CBPV) interpreter, and
+can thus implement many different modalities of lambda calculus evaluation.
+
 License
 -------
 
@@ -120,3 +221,18 @@ Support
 
 Please feel free to leave issues on this repository, or submit pull requests. I
 will make every effort to respond to them in a timely fashion.
+
+Contributing
+------------
+
+Contributions are welcome--the most wieldy being pull requests, but I can
+negotiate other methods of code delivery. I retain the right to curate the code
+in this repository, but you are within your licensed right to make forks for
+your own purposes. Nevertheless, contributing back upstream is welcome!
+
+Here are some easy things to look at:
+
+- Documentation improvements and clean-up;
+- Code cleanup (especially anything that makes it brief without being inscrutable);
+- Finding bugs (they are inevitable, after all);
+- Improving workflows (tell me what's hard to accomplish).
