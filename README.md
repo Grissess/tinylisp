@@ -21,6 +21,13 @@ basic executable should be usable wherever a POSIX-compliant libc (threading
 not required) is available. Special configurations may introduce special
 compilation requirements; see especially [Small Systems](#Small_Systems) below.
 
+Building
+--------
+
+`make help` in the repository root prints out a plethora of build information.
+It's more up-to-date than this README; read it carefully, and type `make` when
+you're ready.
+
 Running
 -------
 
@@ -35,6 +42,12 @@ refer to the language specification in the documentation.
 
 Many variations are possible; run `make help` to get a full list of influential
 variables and their documentation.
+
+As of late, on UNIX, the above can be emulated as
+
+	$(DEBUGGER) ./tl std.tl
+
+but the former syntax works as well.
 
 Embedding
 ---------

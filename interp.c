@@ -1,5 +1,7 @@
 #include "tinylisp.h"
 
+TL_DECLARE_INIT_ENTS;
+
 /** An internal macro for creating a new binding inside of a frame. */
 #define _tl_frm_set(sm, obj, fm) tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, sm), obj), fm)
 
@@ -103,11 +105,11 @@ void tl_interp_init_alloc(tl_interp *in, void *(*reallocf)(tl_interp *, void *, 
  */
 tl_object *tl_interp_load_funcs(tl_interp *in, tl_object *frame, tl_init_ent *start, tl_init_ent *stop) {
 #ifdef LOAD_DEBUG
-	fprintf(stderr, "Load starts from %p to %p:\n", start, stop);
+	fprintf(stderr, "Load on %p starts from %p to %p:\n", in, start, stop);
 #endif
 	while(start != stop) {
 #ifdef LOAD_DEBUG
-		fprintf(stderr, "Loading %s %s from %p...\n", start->flags & TL_EF_BYVAL ? "cfunc_byval" : "cfunc", start->name, start->fn);
+		fprintf(stderr, "Loading %s %s declared in %s:%u from %p...\n", start->flags & TL_EF_BYVAL ? "cfunc_byval" : "cfunc", start->name, start->file, start->line, start->fn);
 #endif
 		frame = _tl_frm_set(
 				start->name,

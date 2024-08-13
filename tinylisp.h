@@ -34,7 +34,7 @@
 #endif
 #endif
 
-#if defined(MODULE) && !defined(MODULE_BUILTIN)
+#if defined(SHARED_LIB) || (defined(MODULE) && !defined(MODULE_BUILTIN))
 #define TL_EXTERN extern
 #else
 /** `extern` keyword used throughout the header
@@ -754,6 +754,10 @@ typedef struct tl_init_ent_s {
 	const char *name;
 	/** `TL_EF` constants, OR'd together. */
 	size_t flags;
+	/** The file in which this was declared. */
+	const char *file;
+	/** The line in which this was declared. */
+	unsigned line;
 } __attribute__((aligned(8))) tl_init_ent;
 
 TL_EXTERN void tl_interp_init(tl_interp *);
@@ -778,6 +782,11 @@ TL_EXTERN tl_object *tl_interp_load_funcs(tl_interp *, tl_object *, tl_init_ent 
 #define tl_error_clear(in) ((in)->error = NULL)
 /** Evaluates to whether or not the interpreter has an error state. */
 #define tl_has_error(in) ((in)->error)
+/** Reset the state of the interpreter to a "clean" state.
+ *
+ * This clears errors, continuations, and values. It's a safe start for a REPL.
+ */
+#define tl_interp_reset(in) (tl_error_clear(in), (in)->conts = (in)->values = TL_EMPTY_LIST)
 
 /** Gets a character from the interpreter's input stream.
  *
@@ -787,7 +796,8 @@ TL_EXTERN tl_object *tl_interp_load_funcs(tl_interp *, tl_object *, tl_init_ent 
  * of `TL_RESULT_GETCHAR`.
  */
 #define tl_getc(in) ((in)->is_putback ? ((in)->is_putback = 0, (in)->putback) : (in)->readf((in)))
-/** Put back a character to be read again with `tl_getc`, like `ungetc` in stdio.
+/** Put back a character to be read again with `tl_getc`, like `ungetc` in
+ * stdio.
  *
  * TinyLISP only stores one putback character at a time.
  */
@@ -1051,11 +1061,16 @@ static int tl_init
 
 #endif  /* ifdef MODULE */
 
-#define TL_START_INIT_ENTS_NAME __start_tl_init_ents
-#define TL_STOP_INIT_ENTS_NAME __stop_tl_init_ents
-extern tl_init_ent TL_START_INIT_ENTS_NAME, TL_STOP_INIT_ENTS_NAME;
-#define TL_START_INIT_ENTS &TL_START_INIT_ENTS_NAME
-#define TL_STOP_INIT_ENTS &TL_STOP_INIT_ENTS_NAME
+#define TL_CONCAT(a, b) a##b
+#define TL_STRINGIFY(a) TL_STRINGIFY2(a)
+#define TL_STRINGIFY2(a) #a
+#define TL_PREFIX "tl-"
+#define TL_INIT_ENTS_SECTION_NAME tl_init_ents
+#define TL_START_SEC_SYM(name) TL_CONCAT(__start_, name)
+#define TL_STOP_SEC_SYM(name) TL_CONCAT(__stop_, name)
+#define TL_DECLARE_INIT_ENTS extern tl_init_ent TL_START_SEC_SYM(TL_INIT_ENTS_SECTION_NAME), TL_STOP_SEC_SYM(TL_INIT_ENTS_SECTION_NAME)
+#define TL_START_INIT_ENTS &TL_START_SEC_SYM(TL_INIT_ENTS_SECTION_NAME)
+#define TL_STOP_INIT_ENTS &TL_STOP_SEC_SYM(TL_INIT_ENTS_SECTION_NAME)
 
 /** Define a ::tl_init_ent .
  *
@@ -1079,8 +1094,9 @@ extern tl_init_ent TL_START_INIT_ENTS_NAME, TL_STOP_INIT_ENTS_NAME;
  * entries. (This is ultimately what ::tl_interp_init does.)
  */
 #define TL_CF_FLAGS(func, nm, f) void tl_cf_##func(tl_interp *, tl_object *, tl_object *);\
-static tl_init_ent __attribute__((section("tl_init_ents"),aligned(8),used)) init_tl_cf_##func = {\
-	.fn = tl_cf_##func, .name = "tl-" nm, .flags = (f),\
+static tl_init_ent __attribute__((section(TL_STRINGIFY(TL_INIT_ENTS_SECTION_NAME)),aligned(8),used)) init_tl_cf_##func = {\
+	.fn = tl_cf_##func, .name = TL_PREFIX nm, .flags = (f),\
+	.file = __FILE__, .line = __LINE__,\
 };\
 void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
 /** Declare a CFUNC.
@@ -1109,9 +1125,10 @@ void tl_cf_##func(tl_interp *in, tl_object *args, tl_object *_)
  */
 #define TL_CFBV(func, nm) TL_CF_FLAGS(func, nm, TL_EF_BYVAL)
 
-#if defined(MODULE) && !defined(MODULE_BUILTIN)
+#ifndef MODULE_BUILTIN
 #define TL_LOAD_FUNCS do { \
-	tl_object *frm = NULL; \
+	TL_DECLARE_INIT_ENTS; \
+	tl_object *frm = TL_EMPTY_LIST; \
 	frm = tl_interp_load_funcs(in, frm, TL_START_INIT_ENTS, TL_STOP_INIT_ENTS); \
 	tl_env_merge(in, tl_env_top_pair(in), frm); \
 } while(0)

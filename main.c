@@ -5,20 +5,44 @@
 
 #ifdef UNIX
 #include <unistd.h>
+#include <errno.h>
 #endif
 
 #include "tinylisp.h"
 
+static int _standard_readf(tl_interp *in) { return getchar(); }
+
+struct input_ent {
+	struct input_ent *next;
+	char *name;
+	FILE *input;
+} *inputs = NULL;
+
+static int _input_readf(tl_interp *in) {
+retry:
+	if(inputs) {
+		int result = fgetc(inputs->input);
+		if(result == EOF) {
+			struct input_ent *next = inputs->next;
+			free(inputs);
+			inputs = next;
+			goto retry;
+		}
+		return result;
+	} else {
+		in->readf = _standard_readf;
+		return _standard_readf(in);
+	}
+}
+
 #ifdef INITSCRIPTS
 extern char __start_tl_init_scripts, __stop_tl_init_scripts;
-
-static int _postscript_readf(tl_interp *in) { return getchar(); }
 
 static int _initscript_readf(tl_interp *in) {
 	static char *ptr = &__start_tl_init_scripts;
 	if(ptr >= &__stop_tl_init_scripts) {
-		in->readf = _postscript_readf;
-		return _postscript_readf(in);
+		in->readf = _input_readf;
+		return _input_readf(in);
 	}
 	return (int) *ptr++;
 }
@@ -180,39 +204,55 @@ extern void *__start_tl_bmcons;
 extern void *__stop_tl_bmcons;
 #endif
 
-int main() {
-	tl_interp in;
+int main(int argc, char **argv) {
+	tl_interp real_in, *in = &real_in;
 	tl_object *expr, *val;
 
-	_global_in = &in;
+	_global_in = in;
 
 #ifdef UNIX
 	if(!isatty(STDIN_FILENO)) {
 		quiet = QUIET_NO_TRUE;
 	}
+
+	for(int i = 1; i < argc; i++) {
+		struct input_ent *ent = malloc(sizeof(struct input_ent));
+		ent->next = inputs;
+		inputs = ent;
+		ent->name = argv[i];
+		if(!(ent->input = fopen(argv[i], "r"))) {
+			fprintf(stderr, "%s: %s\n", argv[i], strerror(errno));
+			return 100;  // leaks, but dies immediately
+		}
+	}
 #endif
 
-	tl_interp_init(&in);
+	tl_interp_init(in);
 #ifdef CONFIG_MODULES
-	in.modloadf = my_modloadf;
+	in->modloadf = my_modloadf;
 #endif
 #ifdef INITSCRIPTS
-	in.readf = _initscript_readf;
+	in->readf = _initscript_readf;
+#else
+	in->readf = _input_readf;
+#endif
+#ifdef SHARED_LIB
+	TL_LOAD_FUNCS;
 #endif
 #ifdef CONFIG_MODULES_BUILTIN
 	{
 		int (**fp)(tl_interp *, const char *) = (int (**)(tl_interp *, const char *))&__start_tl_bmcons;
 		while(fp != (int (**)(tl_interp *, const char *))&__stop_tl_bmcons)
-			(*fp++)(&in, NULL);
+			(*fp++)(in, NULL);
 	}
 #endif
 
 	if(quiet == QUIET_OFF) {
 		tl_prompt("Top Env: ");
-		tl_print(&in, in.top_env);
+		tl_print(in, in->top_env);
 #ifdef NS_DEBUG
 		tl_prompt("Namespace:\n");
-		tl_ns_print(&in, &in.ns);
+		tl_ns_print(in, in->ns);
 #endif
 		fflush(stdout);
 		tl_prompt("\n");
@@ -220,20 +260,20 @@ int main() {
 
 	while(running) {
 		tl_prompt("> ");
-		tl_read_and_then(&in, _main_read_k, TL_EMPTY_LIST);
+		tl_read_and_then(in, _main_read_k, TL_EMPTY_LIST);
 #ifdef FAKE_ASYNC
 		while(1) {
-			int res = tl_apply_next(&in);
+			int res = tl_apply_next(in);
 			if(!res) break;
 			switch(res) {
 				case TL_RESULT_AGAIN: break;
 				case TL_RESULT_GETCHAR:
-					tl_values_push(&in, tl_new_int(&in, getchar()));
+					tl_values_push(in, tl_new_int(in, getchar()));
 					break;
 			}
 		}
 #else
-		tl_run_until_done(&in);
+		tl_run_until_done(in);
 #endif
 		if(!running) {
 			/* Don't inspect anything--tl_interp_cleanup was
@@ -242,36 +282,35 @@ int main() {
 			 */
 			break;
 		}
-		if(in.error) {
+		if(in->error) {
 			/* Don't change these to tl_prompt--errors are always exceptional */
 			fprintf(stderr, "Error: ");
-			tl_print(&in, in.error);
+			tl_print(in, in->error);
 			fflush(stdout);
-			print_cont_stack(&in, in.conts);
+			print_cont_stack(in, in->conts);
 			fprintf(stderr, "\nValues: ");
-			tl_print(&in, in.values);
+			tl_print(in, in->values);
 			fflush(stdout);
-			for(tl_list_iter(in.env, frm)) {
+			for(tl_list_iter(in->env, frm)) {
 				fprintf(stderr, "\nFrame");
 				if(!tl_next(l_frm)) {
 					fprintf(stderr, "(Outer)");
 				}
-				if(l_frm == in.env) {
+				if(l_frm == in->env) {
 					fprintf(stderr, "(Inner)");
 				}
 				fprintf(stderr, ": ");
-				tl_print(&in, frm);
+				tl_print(in, frm);
 				fflush(stdout);
 			}
 			fprintf(stderr, "\n");
-			tl_error_clear(&in);
+			tl_error_clear(in);
 		}
-		in.conts = TL_EMPTY_LIST;
-		in.values = TL_EMPTY_LIST;  /* Expected: (tl-#t) due to _main_k */
-		tl_gc(&in);
+		tl_interp_reset(in);
+		tl_gc(in);
 #ifdef NS_DEBUG
 		tl_prompt("Namespace:\n");
-		tl_ns_print(&in, &in.ns);
+		tl_ns_print(in, in->ns);
 #endif
 	}
 }
