@@ -172,7 +172,7 @@ void _tl_apply_next_body_callable_k(tl_interp *in, tl_object *args, tl_object *c
 		}
 
 		if(is_improp ? (tl_list_len(args) < paramlen) : (tl_list_len(args) != paramlen)) {
-			tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "bad arity"), tl_new_int(in, paramlen)), args));
+			tl_error_set(in, tl_new_pair(in, tl_new_pair(in, tl_new_sym(in, "bad arity"), tl_new_pair(in, tl_new_int(in, paramlen), callex)), args));
 			tl_cfunc_return(in, in->false_);
 		}
 

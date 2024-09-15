@@ -3,7 +3,7 @@
 
 #include "tinylisp.h"
 
-void _indent(int lev) {
+static void _indent(int lev) {
 	int i;
 	for(i = 0; i < lev; i++) {
 		fprintf(stderr, "  ");

@@ -635,6 +635,12 @@ struct tl_interp_s {
 	 * (a tab character).
 	 */
 	char disp_sep;
+	/** The character `tl-display` uses to indent nested lists.
+	 *
+	 * This can be set at runtime with tl-display-indent. By default, it is
+	 * `\0', which means no indentation is done.
+	 */
+	char disp_indent;
 	/** An opaque "user data" pointer for use with interface functions.
 	 *
 	 * This value is stored but never modified by TinyLISP; it is not even

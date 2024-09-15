@@ -102,6 +102,24 @@ TL_CFBV(display_sep, "display-sep") {
 	tl_cfunc_return(in, in->true_);
 }
 
+TL_CFBV(display_indent, "display-indent") {
+	tl_object *arg;
+	if(!args) {
+		tl_cfunc_return(in, tl_new_sym_data(in, &in->disp_indent, 1));
+	}
+	arg = tl_first(args);
+	if(!tl_is_sym(arg)) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "tl-display-indent with non-sym"), arg));
+		tl_cfunc_return(in, in->false_);
+	}
+	if(!arg->nm->here.len) {
+		in->disp_indent = '\0';
+	} else {
+		in->disp_indent = arg->nm->here.data[0];
+	}
+	tl_cfunc_return(in, in->true_);
+}
+
 TL_CF(prefix, "prefix") {
 	tl_object *prefix = tl_first(args);
 	tl_object *name = tl_first(tl_next(args));
@@ -181,9 +199,12 @@ TL_CFBV(env, "env") {
 	if(!f) {
 		tl_cfunc_return(in, in->env);
 	}
-	if(!(tl_is_macro(f) || tl_is_func(f))) {
-		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "env of non-func or -macro"), f));
+	if(!(tl_is_macro(f) || tl_is_func(f) || tl_is_cont(f))) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "env of non-func, -macro, or -cont"), f));
 		tl_cfunc_return(in, in->false_);
+	}
+	if(tl_is_cont(f)) {
+		tl_cfunc_return(in, f->ret_env);
 	}
 	tl_cfunc_return(in, f->env);
 }
@@ -194,11 +215,15 @@ TL_CFBV(setenv, "set-env!") {
 		in->env = first;
 		tl_cfunc_return(in, in->true_);
 	}
-	if(!(tl_is_macro(first) || tl_is_func(first))) {
-		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "setenv on non-func or -macro"), first));
+	if(!(tl_is_macro(first) || tl_is_func(first) || tl_is_cont(first))) {
+		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "setenv on non-func, -macro, or -cont"), first));
 		tl_cfunc_return(in, in->false_);
 	}
-	first->env = next;
+	if(tl_is_cont(first)) {
+		first->ret_env = next;
+	} else {
+		first->env = next;
+	}
 	tl_cfunc_return(in, in->true_);
 }
 

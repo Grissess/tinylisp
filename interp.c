@@ -81,6 +81,7 @@ void tl_interp_init_alloc(tl_interp *in, void *(*reallocf)(tl_interp *, void *, 
 	in->is_putback = 0;
 	in->read_buffer = NULL;
 	in->disp_sep = '\t';
+	in->disp_indent = '\0';
 	in->next_tag = 1;
 
 	in->top_env = TL_EMPTY_LIST;

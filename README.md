@@ -223,6 +223,188 @@ advanced features, such as lazy evaluation.
 In short, the TL evaluator is a "Call by Push Value" (CBPV) interpreter, and
 can thus implement many different modalities of lambda calculus evaluation.
 
+General Parameter Syntax
+------------------------
+
+User functions (both `lambda` and `macro`) are defined with a parameter
+specification as their first argument. An argument list, as from the
+application of a user function, is applied to the parameter specification
+recursively as follows:
+
+- If the current parameter is a pair, the first argument value is bound to the
+  first symbol (see Environments, below), and this process recurs with the
+  remainder of the parameters and arguments;
+- If the current parameter is a symbol, all remaining arguments are bound to
+  that symbol.
+
+It is an error if the first case is reached and either the current parameter or
+current argument is an empty list; such errors are "arity" violations. (C
+functions may emit arity violations, although such checks are built-in.) Thus,
+the length of the parameter list, or whether it is a list, determines the arity
+of the function.
+
+For example: `(lambda (a b c) ...)` defines a function with arity exactly 3; it
+will fail when applied with less or more than 3 argument values. `(lambda (a b
+. c) ...)` defines a function with arity at least 2, where symbol `c` evaluates
+to a (possibly empty) list of arguments beyond `b`. `(lambda a ...)` defines a
+function with arbitrary arity, where all arguments are assigned to the symbol
+`a`. Without loss of generality, this applies to `macro`s as well.
+
+Environments
+------------
+
+A TL _environment_ is a proper list of frames; a _frame_ is a proper list of
+bindings; and a _binding_ is a pair of a symbol and an object. Symbols, when
+evaluated, are looked up in the current environment. Lookup proceeds in frame
+order, which means bindings in earlier frames _shadow_ bindings in later
+frames.
+
+The built-in `tl-define` creates or updates a binding in the first frame only.
+The built-in `tl-set!` will update a binding in _any_ frame, or create it in
+the first frame if it does not exist. While `tl-set!` permits greater
+flexibility, `tl-define` is more performant, and the use of `tl-define`
+encourages further performance gains due to data locality.
+
+The current environment can be accessed with the built-in `tl-env` function
+without arguments. When the interpreter begins, this environment has only one
+frame; that environment can be retrieved as the value of the `tl-top-env`
+function.
+
+User-defined functions (`lambda` or `macro`) store the environment at the time
+of their definition. When applied, a new frame is prepended to the stored
+environment. In the process of evaluation of a user function:
+
+1. This new frame is set up with the formal parameters bound to the argument
+   values (themselves evaluated to direct values if the function is a `lambda`)
+   according to the General Parameter process above; and
+2. the user code is pushed onto the continuation stack, tail-first, in the new
+   environment.
+
+This mechanism allows users to create new scopes dynamically. It will be seen
+in Continuations, below, how this can be used to create encapsulation.
+
+A user function, as well as a continuation, can be passed as the sole argument
+to `tl-env`; this returns the stored environment of the function or
+continuation. `tl-set-env!`, given a function (or continuation) and an
+environment, will set the object's stored environment. The stored environment
+can be passed to the built-in `tl-eval-in&` to evaluate an expression in that
+environment, effectively allowing one to operate within the environment without
+invoking or resuming the function or continuation.
+
+Macros, when defined, receive an additional symbol after their parameter
+specification, and before their body, called the "environment name". This
+symbol is bound to the environment in which the macro was applied. This value
+is suitable for use with `tl-eval-in&` to evaluate code in the scope of the
+macro's invocation.
+
+Continuations
+-------------
+
+TL has first-class support for continuations, which are a value that represents
+a suspended computation. The core function is
+`tl-call-with-current-continuation` (which `std.tl` binds to the more-brief
+`call/cc`), which invokes its argument with a continuation representing the
+state of the interpreter as of entering `call/cc`. Typical usage looks as
+follows:
+
+```
+(call/cc (lambda (k) ...))
+```
+
+This expression evaluates, absent any syntax which calls `k`, to the result of
+calling the `lambda`, which is usually the tail position of `...`. However, if
+`k` is called, such as via `(k 7)`, evaluation _resumes as if_ this particular
+`call/cc` had evaluated to `7` instead. Arguments to continuations, like those
+to a `lambda`, are evaluated in the current environment before control is
+passed.
+
+Within the `lambda` above, this can be interpreted as implementing "early
+return"; for example:
+
+```
+(call/cc (lambda (return)
+  ...
+  (if not-worth-continuing
+    (return #f)
+    ...
+  )
+))
+```
+
+In this example, the second `...` is evaluated if and only if the computation
+hasn't been "abandoned" by a true value of `not-worth-continuing` causing the
+invocation of `return`. This trick is used to convert the built-in
+`tl-eval-in&` to the more straightforward `tl-eval-in` often used in macros:
+
+```
+(define tl-eval-in
+  (lambda (env ex)
+    (call/cc (lambda (ret) (tl-eval-in& env ex ret)))))
+```
+
+The `ret` continuation returns to the `call/cc`, which is in the tail position
+of `tl-eval-in`.
+
+It's worth noting that `k`, unlike C's `setjmp`/`longjmp`, can outlive the
+called function. Indeed, `std.tl` defines
+
+```
+(define current-continuation
+  (lambda () (call/cc (lambda (cc) (cc cc)))))
+```
+
+Calling the "current continuation" `cc` with `cc` resumes evaluation from
+`call/cc` as if it had returned the very continuation it began. Used carefully,
+this continuation can be used as a way to pass "messages" back into the
+continuation's scope, not unlike Smalltalk:
+
+```
+(define make-object (lambda (state)
+  (set! message (current-continuation))
+  (cond
+    ((= (tl-type message) 'cont) message)
+    ((= (cadr message) 'foo) ((car message) ...))
+    ((= (cadr message) 'bar) ((car message) ...))
+  )
+))
+```
+
+The frame that holds `state` and `message` as local values is fully held by the
+returned continuation; this means that the `...` can use it as mutable state,
+where it can be used, for example, to implement private member variables. To be
+sure that this continuation escapes, the first `cond` branch uses the internal
+`tl-type` function to recognize whether the value is a continuation, and simply
+returns it if it is. Otherwise, `cond` dispatches to "methods", recognizes by
+their first item; this idiom can be used as follows:
+
+```
+(define send-message (lambda (obj . args)
+  (call/cc (lambda (ret) (obj (cons ret args))))
+))
+(define object (make-object 3))
+(send-message object 'foo)
+(send-message object 'bar 1 2)
+(send-message object 'baz object (+ 5 6))
+```
+
+In order to avoid escaping back to `(define object ...)`, the methods pass a
+"return continuation" as the first element of a list; this is a common pattern
+allowing for cooperative coroutines, and moreover allows one to define a
+suspendable computation graph independent of the call stack (permitting
+scheduling and yielding, a la "async/await" in other languages). Note that the
+number of times a continuation can be invoked is arbitrary.
+
+Internally, a continuation is a triple of the continuation stack, the value
+stack, and the environment. These three objects are, together, considered to be
+"the state" of the interpreter at any given time.
+`tl-call-with-current-continuation` captures its invocation state, and then
+pushes this object as the sole (direct) value applied to its argument.
+Resumption is implemented as a special case in `tl_apply_next`, the
+interpreter's "next state" quantum, where it restores the state from the
+continuation and pushes its sole expected argument. The value can be direct or
+syntactic; if it is syntactic, it is evaluated in a substate (pushed on the
+continuation stack).
+
 License
 -------
 

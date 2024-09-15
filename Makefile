@@ -5,7 +5,7 @@ LIB :=
 INITSCRIPT_OBJ :=
 SRC = $(patsubst %.o,%.c,$(OBJ))
 CFLAGS ?= -g -std=gnu99 -DDEBUG $(DEFINES)
-LDFLAGS ?=
+LDFLAGS ?= -Wl,-rpath=.
 DESTDIR ?= /usr/local/
 BINPATH ?= $(DESTDIR)/bin/
 LIBPATH ?= $(DESTDIR)/lib/

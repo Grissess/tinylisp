@@ -6,14 +6,24 @@
 
 #define QUOTED_SYM_CHARS "0123456789.,'\"` \n\r\t\b\v"
 
-void _print_pairs(tl_interp *in, tl_object *cur) {
+tl_object *_tl_print(tl_interp *, tl_object *, size_t);
+
+static void _indent(tl_interp *in, size_t level) {
+	while(level--) tl_putc(in, in->disp_indent);
+}
+
+void _print_pairs(tl_interp *in, tl_object *cur, size_t level) {
 	while(cur) {
+		if(in->disp_indent) {
+			tl_putc(in, '\n');
+			_indent(in, level);
+		}
 		if(!tl_is_pair(cur)) {
 			tl_printf(in, ". ");
-			tl_print(in, cur);
-			cur = NULL;
+			_tl_print(in, cur, level);
+			cur = TL_EMPTY_LIST;
 		} else {
-			tl_print(in, tl_first(cur));
+			_tl_print(in, tl_first(cur), level);
 			if(tl_next(cur)) {
 				tl_printf(in, " ");
 			}
@@ -34,6 +44,10 @@ char *_mempbrk(char *m, char *s, size_t sz) {
 }
 
 tl_object *tl_print(tl_interp *in, tl_object *obj) {
+	return _tl_print(in, obj, 0);
+}
+
+tl_object *_tl_print(tl_interp *in, tl_object *obj, size_t level) {
 	tl_object *cur;
 	if(!obj) {
 		tl_printf(in, "()");
@@ -56,7 +70,11 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 
 		case TL_PAIR:
 			tl_printf(in, "(");
-			_print_pairs(in, obj);
+			_print_pairs(in, obj, level + 1);
+			if(in->disp_indent) {
+				tl_putc(in, '\n');
+				_indent(in, level);
+			}
 			tl_printf(in, ")");
 			break;
 
@@ -74,13 +92,17 @@ tl_object *tl_print(tl_interp *in, tl_object *obj) {
 		case TL_MACRO:
 		case TL_FUNC:
 			tl_printf(in, "(%s ", obj->kind == TL_MACRO ? "macro" : "lambda");
-			tl_print(in, obj->args);
-			tl_printf(in, " ");
+			_tl_print(in, obj->args, level + 1);
+			tl_putc(in, ' ');
 			if(tl_is_macro(obj)) {
-				tl_print(in, obj->envn);
-				tl_printf(in, " ");
+				_tl_print(in, obj->envn, level + 1);
+				tl_putc(in, ' ');
 			}
-			_print_pairs(in, obj->body);
+			_print_pairs(in, obj->body, level + 1);
+			if(in->disp_indent) {
+				tl_putc(in, '\n');
+				_indent(in, level);
+			}
 			tl_printf(in, ")");
 			break;
 
