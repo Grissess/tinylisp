@@ -48,3 +48,21 @@
 (define inst-eval (lambda (obj expr)
   (tl-eval-in (tl-env obj) expr)
 ))
+
+(define class (macro (name args . body) env
+  (tl-eval-in env
+    `(define ,name (lambda ,args
+      (inst-var #class ,name)
+      (inst-var #classname (quote ,name))
+      @body
+    ))
+  )
+))
+
+(define typeof (lambda (obj)
+  (inst-eval obj '#class)
+))
+
+(define typenameof (lambda (obj)
+  (inst-eval obj '#classname)
+))

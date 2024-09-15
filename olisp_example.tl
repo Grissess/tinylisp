@@ -2,7 +2,7 @@
 ;
 ; Depends on olisp.tl
 
-(define new-object (lambda (state)
+(class new-object (state)
   (inst-var hidden tl-#t)
   (methods
     (print () (display #message))
@@ -13,10 +13,11 @@
     (showenv () (display (if hidden '"(hidden)" (tl-env))))
     (#method-missing (method . args) `("I am method" ,method "with args" @args))
   )
-))
+)
 
 (define object (new-object 55))
 (define other-object (new-object 'aa))
+(display '"class of object" (typenameof object) (typeof object))
 (display '"other object state" (call other-object 'getstate))
 (display '"old state" (call object 'getstate))
 (call object 'setstate 77)
