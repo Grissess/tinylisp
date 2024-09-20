@@ -189,15 +189,19 @@ to a value (eventually--so long as the continuation is actually reached, for
 example), which it then passes to its continuation. Note that TL must maintain
 an in-code distinction between syntactic and direct values; for example:
 
-	(tl-eval-in& (tl-env) 2 display)
+	(call/cc (lambda (cc) cc))
 
-...will display 2 (recall that numbers are self-valuating). However:
+... successfully binds a continuation object to `cc` in the scope of the
+`lambda` user function. However:
 
-	(tl-eval-in& (tl-env) 2 define)
+	(call/cc (macro (cc) env cc))
 
-...will attempt to call `define` with the arguments `(2)`, where it is
-understood that 2 is a direct (non-syntactic) value. Because `define` expects a
-syntax to capture, the interpreter throws an error and abandons the evaluation.
+... will attempt to call the user `macro` with a continuation as an argument;
+as described below, continuations are values that do _not_ have a
+self-valuating syntax, since they capture the delicate internal state of the
+interpreter. Because `macro`s expect a syntax to capture, the interpreter
+throws an error (`"invoke macro/cfunc with non-syntactic arg"`) and abandons
+the evaluation.
 
 The general rule for language users is as follows: if you expect a real value,
 use `lambda`; if you expect syntax, use `macro`. For example, `2`, `(begin 2)`,
@@ -222,6 +226,54 @@ advanced features, such as lazy evaluation.
 
 In short, the TL evaluator is a "Call by Push Value" (CBPV) interpreter, and
 can thus implement many different modalities of lambda calculus evaluation.
+
+Errors
+------
+
+TinyLISP is not a total language; it is possible for computations to not only
+run indefinitely, but also to be abandoned. While there are many ways to do
+this (including invoking a continuation, as described below), likely the most
+mundane is the generation of an `error`. Various built-in functions will raise
+errors if they are inappropriately applied (to the wrong types of arguments, to
+invalid numbers of arguments, or--as above--to direct values when they are
+expecting syntax, and so forth). User code can invoke the built-in function
+`tl-error` to raise an error directly.
+
+TinyLISP has a so-called "rescue stack", which is initially empty. When it is
+empty, an error will propagate directly to the C top-level, wherein
+`tl_apply_next` returns `TL_RESULT_DONE` (which ends any running
+`tl_run_until_done` call), and the interpreter's `error` field will be
+non-`NULL`. (This means the empty list, which is incidentally represented as
+`NULL`, is never a valid error value.) An interpreter in error state will not
+resume until `error` is cleared; usually, the entire computation is abandoned
+with `tl_interp_reset` before beginning a new evaluation. However, it is
+possible to restart the same computation, on the understanding that the values
+may not be sensible due to the error condition; most built-in functions will
+return `tl-#f` (the standard "false" symbol), which may cause further errors.
+
+User code can use `tl-rescue`, which expects a callable argument that takes no
+parameters, to push a continuation onto the rescue stack. When this stack isn't
+empty and an error is generated, the `error` object is passed to the topmost
+continuation--in effect, the program behaves as if `tl-rescue` returned the
+error object. If no error is generated, `tl-rescue` evaluates to the result of
+evaluating the callable. Note that there is no guaranteed way to distinguish
+successful results and `error` objects without construction: it may be
+necessary to structure the evaluation of the callable to guarantee that a
+returned value is unlikely to be mistaken for an error.
+
+C programs may push continuations (or a `TL_THEN` C continuation) onto the
+rescue stack as well, provided it is careful to balance with an appropriate
+`TL_DROP_RESCUE` special pushed onto the continuation stack simultaneously.
+This permits C code to react to errors without having them propagate to the
+top-level `tl_run_until_done` loop if so desired. See the comments in `eval.c`
+and relevant definitions in `tinylisp.h` for more details.
+
+While this mechanism can be used for non-local stack-based return like C's
+`setjmp`/`longjmp`, it is internally built on continuations, which are a far
+more powerful non-local control flow mechanism; as such, most TL users are
+expected to use them directly instead; see Continuations, below. Nevertheless,
+errors are the correct choice to represent divergent computations, usually due
+to incorrectness.
 
 General Parameter Syntax
 ------------------------
@@ -346,17 +398,17 @@ The `ret` continuation returns to the `call/cc`, which is in the tail position
 of `tl-eval-in`.
 
 It's worth noting that `k`, unlike C's `setjmp`/`longjmp`, can outlive the
-called function. Indeed, `std.tl` defines
+called function. Indeed,
 
 ```
 (define current-continuation
-  (lambda () (call/cc (lambda (cc) (cc cc)))))
+  (lambda () (call/cc (lambda (cc) cc))))
 ```
 
-Calling the "current continuation" `cc` with `cc` resumes evaluation from
-`call/cc` as if it had returned the very continuation it began. Used carefully,
-this continuation can be used as a way to pass "messages" back into the
-continuation's scope, not unlike Smalltalk:
+returns the continuation entered by calling this user function. (The real
+definition in `std.tl` is a macro to avoid issues with scoping, but has largely
+equivalent behavior.) Used carefully, this continuation can be used as a way to
+pass "messages" back into the continuation's scope, not unlike Smalltalk:
 
 ```
 (define make-object (lambda (state)
@@ -404,6 +456,98 @@ interpreter's "next state" quantum, where it restores the state from the
 continuation and pushes its sole expected argument. The value can be direct or
 syntactic; if it is syntactic, it is evaluated in a substate (pushed on the
 continuation stack).
+
+Continuation and Values Stacks
+------------------------------
+
+In fitting with the Call-by-Push-Value mode, TL interpreters maintain two
+stacks, `conts` (continuations) and `values`. The `value` stack is, at all
+times, a proper list (whose top is the `car`) of pairs of objects and a
+"syntax" flag--this is `tl-#t` if the value is syntactic, and `tl-#f` if the
+value is direct. (The intepreter has two fields, `true_` and `false_`, that
+cache these symbols, so comparison is fast.) The continuation stack is more
+complicated, and represents, more or less, a call stack for the running
+computation; it, too, is a proper list used as a stack, whose elements are
+improper lists of the form `(len expr . env)`. `len` may take some special
+values, all of which are negative:
+
+- `TL_APPLY_PUSH_EVAL` (-1): `expr` is a syntax, and `env` is the environment
+  in which it shall be evaluated. Usually, this syntax is an application, which
+  is handled by `tl_push_eval` by "indirecting" into a more primitive
+  application on the continuation stack, as described below.
+  
+- `TL_APPLY_INDIRECT` (-2): what would ordinarily be `expr` is taken from the
+  value stack; it must be a direct callable value. The `expr` position of the
+  entry contains the `len` to be used in the application. This is pushed when a
+  complex expression needs to evaluate its callable before it can apply it.
+
+- `TL_APPLY_DROP_EVAL` (-3): as `TL_APPLY_PUSH_EVAL`, but the value is silently
+  discarded. This is the typical case for non-tail-position user code in a user
+  function.
+
+- `TL_APPLY_DROP` (-4): ignores `expr` and `env`, and simply drops the top of
+  the value stack. This is emitted in a pair with `TL_APPLY_INDRECT` whenever a
+  `TL_APPLY_DROP_EVAL` must be indirected.
+
+- `TL_APPLY_DROP_RESCUE` (-5): ignores `expr` and `env`, and simply drops the
+  top of the rescue stack. This is pushed simultaneously with the new rescue
+  continuation, and serves to remove it if the computation succeeds.
+
+- `TL_APPLY_GETCHAR` (-6): stops `tl_apply_next`, returning
+  `TL_RESULT_GETCHAR`. This is a signal to the top-level (usually
+  `tl_run_until_done`, but also any other driver) that more input is needed.
+  Allowing the call to `tl_apply_next` to end allows a driver to asynchronously
+  restart the computation when more input is needed.
+
+- Otherwise, the entry is a "basic application", where `expr` is a callable
+  object, `env` is the environment, and `len` is the number of values it
+  expects; `len` values are popped from the value stack, pushing evaluations
+  from right to left (such that evaluation order is left to right) if the
+  callable expects direct arguments (a `cfunc_byval` or a user `lambda`), or
+  raising an error if the callable expects syntax arguments (a `cfunc`, `then`,
+  or `macro`) and any argument is a direct value. If collection succeeds, these
+  arguments are then passed to the appropriate C function, or to user code as
+  the "argument list" described in General Parameters above.
+
+The usual way to evaluate a TL expression from C, then, is to synthesize a
+one-argument application:
+
+```c
+tl_interp *in = ...;
+tl_object *state = ...;
+tl_object *expr = ...;
+void _c_continuation_k(tl_interp *in, tl_object *args, tl_object *state) { ... }
+
+tl_push_apply(in, 1, tl_new_then(in, _c_continuation_k, state, "_c_continuation_k"), in->env);
+tl_push_eval(in, expr, in->env);
+```
+
+In this way, the continuation `_c_continuation_k` eventually receives a proper
+list of length one, whose `car` is the direct value of the evaluated `expr`.
+The interpreter environment `in->env` is assumed to be in a valid state; in a
+REPL, this is usually `in->top_env`. The string passed to `tl_new_then` is a
+debugging aid. `state` may be `TL_EMPTY_LIST` (or, equivalently, `NULL`) if the
+communication of state is not needed.
+
+The idea of pushing applications and evaluable expressions simultaneously
+generalizes, of course, to many different applications, many different kinds of
+callables, and many different expressions in many different environments, so
+long as the stack discipline is observed. In particular, the sum of the `len`
+of all applications should equal the number of value pushes done.
+
+It is also possible to spend one redirection to pair an application and its
+values directly:
+
+```c
+tl_push_apply(in, 1, tl_new_then(in, _c_continuation_k, state, "_c_continuation_k"), in->env);
+tl_push_apply(in, TL_APPLY_PUSH_EVAL, expr, in->env);
+```
+
+... though more care must be taken to sequence these correctly, as now the
+evaluations will be sequenced with respect to the continuation stack; in
+particular, the last `TL_APPLY_PUSH_EVAL` will become the first argument. In
+essence, this device dynamically arises in the evaluation of user functions,
+which appear in place of the `tl_new_then` call above.
 
 License
 -------

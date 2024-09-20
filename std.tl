@@ -53,7 +53,7 @@
     (call/cc (lambda (ret) (tl-eval-in& env ex ret)))))
 
 (define current-continuation
-  (macro () env (tl-eval-in env '((lambda () (call/cc (lambda (cc) (cc cc))))))))
+  (macro () env (tl-eval-in env '((lambda () (call/cc (lambda (cc) cc)))))))
 
 ; Essential combinatorics
 
