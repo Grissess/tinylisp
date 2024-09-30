@@ -200,8 +200,8 @@ void print_cont_stack(tl_interp *in, tl_object *stack) {
 
 
 #ifdef CONFIG_MODULES_BUILTIN
-extern void *__start_tl_bmcons;
-extern void *__stop_tl_bmcons;
+extern void *__start_tl_module_init;
+extern void *__stop_tl_module_init;
 #endif
 
 int main(int argc, char **argv) {
@@ -241,8 +241,8 @@ int main(int argc, char **argv) {
 #endif
 #ifdef CONFIG_MODULES_BUILTIN
 	{
-		int (**fp)(tl_interp *, const char *) = (int (**)(tl_interp *, const char *))&__start_tl_bmcons;
-		while(fp != (int (**)(tl_interp *, const char *))&__stop_tl_bmcons)
+		int (**fp)(tl_interp *, const char *) = (int (**)(tl_interp *, const char *))&__start_tl_module_init;
+		while(fp != (int (**)(tl_interp *, const char *))&__stop_tl_module_init)
 			(*fp++)(in, NULL);
 	}
 #endif

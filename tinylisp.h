@@ -1056,7 +1056,7 @@ TL_EXTERN void tl_cf_debug_print(tl_interp *, tl_object *, tl_object *);
 #ifdef MODULE_BUILTIN
 
 #define TL_MOD_INIT static int tl_init(tl_interp *, const char *); \
-static void * __attribute__((section("tl_bmcons"))) tl_init_fp = tl_init; \
+static void * __attribute__((section("tl_module_init"))) tl_init_fp = tl_init; \
 static int tl_init
 
 #else
