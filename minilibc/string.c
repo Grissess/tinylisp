@@ -1,4 +1,5 @@
 #include "string.h"
+#include "errno.h"
 
 #include <stdlib.h>
 
@@ -70,4 +71,14 @@ void *memmove(void *dest, const void *src, size_t n) {
 		memcpy(dest, src, n);
 	}
 	return dest;
+}
+
+char *errors[] = {
+	"No error",
+	"No such file or directory",
+};
+
+char *strerror(int err) {
+	if(err < 0 || err > _LARGEST_ERRNO) return "(invalid error value)";
+	return errors[err];
 }

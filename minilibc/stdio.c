@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include "string.h"
 #include "arch.h"
+#include "errno.h"
 
 #include <stdarg.h>
 
@@ -48,6 +49,7 @@ FILE *fopen(const char *name, const char *mode) {
 	if(!strcmp(name, "/dev/stdin") && *mode == 'r') return stdin;
 	if(!strcmp(name, "/dev/stdout") && *mode == 'w') return stdout;
 	if(!strcmp(name, "/dev/stderr") && *mode == 'w') return stderr;
+	errno = ENOENT;
 	return NULL;
 }
 

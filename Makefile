@@ -76,7 +76,9 @@ Influential variables (and their current values):
 		When non-empty, the library prefix that will be built. It should
 		probably have 'lib' at the beginning to be found by the usual '-l'
 		argument. A suffix appropriate to $$STATIC will be appended (usually
-		.a, .so, or .dll). When empty, no library is built at all.
+		.a, .so, or .dll). When empty, no library is built at all. This is
+		forced to be empty by USE_MINILIBC, as those targets categorically
+		expect static linkage.
 
 	PLAT = $(PLAT)
 		Your platform:
@@ -87,7 +89,7 @@ Influential variables (and their current values):
 	USE_MINILIBC = $(USE_MINILIBC)
 		If nonempty, use Minilibc (a minimal C library)
 		and build tl statically. (This also affects
-		modules, see below.)
+		modules and linkage, see above and below.)
 
 	MINILIBC_ARCH = $(MINILIBC_ARCH)
 		The architecture backend used by minilibc to
@@ -247,6 +249,7 @@ ifneq ($(USE_MINILIBC),)
 	OBJ += $(patsubst %,minilibc/%.o,string stdio assert stdlib ctype unistd errno)
 	MINILIBC_ARCH ?= linsys
 	MINILIBC_MK := minilibc/arch/$(MINILIBC_ARCH).mk
+	LIBRARY :=
 ifeq ($(V),0)
 	# Nothing at all
 else ifeq ($(V),1)
