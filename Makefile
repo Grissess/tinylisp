@@ -4,8 +4,8 @@ OBJ := $(LIBOBJ) $(APPOBJ)
 LIB := 
 INITSCRIPT_OBJ :=
 SRC = $(patsubst %.o,%.c,$(OBJ))
-CFLAGS ?= -g -std=gnu99 -DDEBUG $(DEFINES)
-LDFLAGS ?= -Wl,-rpath='$$ORIGIN'
+CFLAGS ?= -g -std=gnu99 -DDEBUG $(ADD_CFLAGS)
+LDFLAGS ?= -Wl,-rpath='$$ORIGIN' $(ADD_LDFLAGS)
 DESTDIR ?= /usr/local/
 BINPATH ?= $(DESTDIR)/bin/
 LIBPATH ?= $(DESTDIR)/lib/
@@ -46,17 +46,28 @@ Influential variables (and their current values):
 		Your C compiler.
 
 	CFLAGS = $(CFLAGS)
-		Additional options for your C compiler.
+		Options for your C compiler. This contains the actual set used
+		during compilation; as such, it can change based on platforms
+		and defaults defined in this Makefile. `make help` will, when
+		passed other configuration, show you what would have been used.
+		Setting this from the command line has the effect of overriding
+		these defaults in most circumstances, which may be undesirable.
 
-	DEFINES = $(DEFINES)
-		Items that will be appended to CFLAGS. See
-		'Preprocessor configuration', below.
+	ADD_CFLAGS = $(ADD_CFLAGS)
+		Items that will be appended to CFLAGS. This is left undefined
+		by default, and thus safe to set from the command line. Most
+		commonly used for introducing preprocessor definitions; for
+		that purpose, see 'Preprocessor configuration', below.
 
 	LD = $(LD)
 		Your linker.
 
 	LDFLAGS = $(LDFLAGS)
-		Additional options for your linker.
+		Options for your linker. The same caveats as CFLAGS apply.
+
+	ADD_LDFLAGS = $(ADD_LDFLAGS)
+		Items appended to LDFLAGS. This is left undefined by default,
+		and safe to set from the command line.
 
 	AR = $(AR)
 		Your archiver, for $$STATIC builds.
@@ -142,7 +153,7 @@ Influential variables (and their current values):
 
 Preprocessor configuration:
 	While these can be passed in CFLAGS, the variable
-	DEFINES is provided for your convenience to add these
+	ADD_CFLAGS is provided for your convenience to add these
 	flags. It defaults to empty, while CFLAGS may be changed
 	by your target or other configuration. Most of these are
 	optional, but some may be forced by CFLAGS on various
@@ -228,7 +239,7 @@ Preprocessor configuration:
 		code. This will be deprecated once a load-based GC
 		strategy is implemented. The default is 65536.
 
-	Your current CFLAGS, which include DEFINES, are:
+	Your current CFLAGS, which include ADD_CFLAGS, are:
 		$(CFLAGS)
 endef
 export help_text
@@ -328,13 +339,24 @@ endif
 
 all: $(LIBTARGET) $(INTERPRETER) $(LIB)
 
+define showconfig_text
+	OBJ = $(OBJ)
+	LIBTARGET = $(LIBTARGET)
+	LIB = $(LIB)
+	PLATFORM = $(PLATFORM)
+	MODULES = $(MODULES)
+	MODULES_BUILTIN = $(MODULES_BUILTIN)
+	INITSCRIPTS = $(INITSCRIPTS)
+
+	CC = $(CC)
+	CFLAGS = $(CFLAGS)
+	LD = $(LD)
+	LDFLAGS = $(LDFLAGS)
+endef
+export showconfig_text
+
 define cmd_showconfig
-	echo "OBJ = $(OBJ)"
-	$(Q)echo "LIBTARGET = $(LIBTARGET)"
-	$(Q)echo "LIB = $(LIB)"
-	$(Q)echo "MODULES = $(MODULES)"
-	$(Q)echo "MODULES_BUILTIN = $(MODULES_BUILTIN)"
-	$(Q)echo "INITSCRIPTS = $(INITSCRIPTS)"
+	echo "$$showconfig_text"
 endef
 quiet_showconfig = SHOWCONFIG
 showconfig:
