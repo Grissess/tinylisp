@@ -41,12 +41,18 @@ int VXP_NAME(VXP_ARGS const char *fmt, va_list ap) {
 
 				case 'p':
 					temp.vptr = va_arg(ap, void *);
+hexadecimal:
 					for(i = 8*sizeof(void *)-4; i >= 0; i -= 4) {
 						VXP_PUTC("0123456789ABCDEF"[(temp.ulint >> i) & 0xF]);
 						cnt++;
 					}
 					fmt++;
 					break;
+
+				case 'z':  /* XXX x */
+					temp.ulint = va_arg(ap, size_t);
+					fmt++;
+					goto hexadecimal;
 
 				case 'd':
 					temp.lint = (long)va_arg(ap, int);

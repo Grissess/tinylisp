@@ -20,11 +20,26 @@
 #ifndef TL_DEFAULT_GC_EVENTS
 /** The default number of GC events before a collection is attempted.
  *
- * This is 65536 by default, and refers to the number of ::tl_apply_next calls
- * between automatic collections. This will eventually be superseded by a
- * collector cognizant of load.
+ * This is 0 by default, encouraging ::tl_new to collect only under pressure.
+ * Each event is a ::tl_apply_next call, which is not related to load--as such,
+ * this implementation is subject to change.
  */
-#define TL_DEFAULT_GC_EVENTS 65536
+#define TL_DEFAULT_GC_EVENTS 0
+#endif
+
+#ifndef TL_DEFAULT_OBALLOC_BATCH
+/** The object allocation batch size.
+ *
+ * ::tl_new attempts to allocate this many objects at a time as an array on the
+ * theory that the overhead of managing them in the freelist is less than the
+ * overhead of the memory allocator. This is a significant performance tunable;
+ * on platforms where large allocations can regularly fail, this results in yet
+ * more overhead as ::tl_new has to fall back on allocating single objects
+ * instead. For most general-purpose computers, however, this tunable is best
+ * kept large to keep the freelist (from which allocation is efficient) as full
+ * as possible.
+ */
+#define TL_DEFAULT_OBALLOC_BATCH 65536
 #endif
 
 #if defined(PTR_LSB_AVAILABLE)
@@ -341,7 +356,9 @@ TL_EXTERN tl_object *tl_new_macro(tl_interp *, tl_object *, tl_object *, tl_obje
 TL_EXTERN tl_object *tl_new_cont(tl_interp *, tl_object *, tl_object *, tl_object *);
 TL_EXTERN tl_object *tl_new_ptr(tl_interp *, void *, void (*)(tl_interp *, tl_object *), tl_tag);
 TL_EXTERN void tl_free(tl_interp *, tl_object *);
+TL_EXTERN void tl_destroy(tl_interp *, tl_object *);
 TL_EXTERN void tl_gc(tl_interp *);
+TL_EXTERN void tl_reclaim(tl_interp *);
 
 /** Test whether an object is a ::TL_INT. */
 #define tl_is_int(obj) ((obj) && (obj)->kind == TL_INT)
@@ -540,6 +557,14 @@ struct tl_interp_s {
 	 * allocated objects, to scan the entire set of allocations.
 	 */
 	tl_object *top_alloc;
+	/** A list of free objects.
+	 *
+	 * These objects have been malloc()'d but were unreachable during the last
+	 * GC. While they could be free()'d, it's generally likely that more
+	 * objects will be allocated, and this list gives ::tl_new a happy fast
+	 * path.
+	 */
+	tl_object *free_alloc;
 	/** The "current continuation"
 	 *
 	 * This is the continuation popped of the continuation stack (see below).
@@ -606,6 +631,13 @@ struct tl_interp_s {
 	 * manually), set this to 0.
 	 */
 	size_t gc_events;
+	/** The amount of objects allocated in a batch.
+	 *
+	 * This value represents a performance balance between high memory overhead
+	 * and high time overhead in managing memory allocations. See the
+	 * discussion of ::TL_DEFAULT_OBALLOC_BATCH for details.
+	 */
+	size_t oballoc_batch;
 	/** The "event counter" compared to `gc_events`.
 	 *
 	 * This is incremented by `tl_push_apply`.

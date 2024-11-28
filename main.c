@@ -307,7 +307,9 @@ int main(int argc, char **argv) {
 			tl_error_clear(in);
 		}
 		tl_interp_reset(in);
+#ifndef PROFILING
 		tl_gc(in);
+#endif
 #ifdef NS_DEBUG
 		tl_prompt("Namespace:\n");
 		tl_ns_print(in, in->ns);

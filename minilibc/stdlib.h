@@ -7,6 +7,7 @@ void *malloc(size_t);
 void free(void *);
 void *realloc(void *, size_t);
 void exit(int);
+void abort();
 
 #ifdef MEM_INSPECT
 struct meminfo {

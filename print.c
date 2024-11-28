@@ -173,6 +173,12 @@ void tl_printf(tl_interp *in, const char *cur, ...) {
 					cur += 2;
 					break;
 
+				case 'z':  /* FIXME: zx as above */
+					snprintf(buf, 32, "%zx", va_arg(ap, size_t));
+					tl_puts(in, buf);
+					cur += 2;
+					break;
+
 				case 'd':
 					snprintf(buf, 32, "%d", va_arg(ap, int));
 					tl_puts(in, buf);

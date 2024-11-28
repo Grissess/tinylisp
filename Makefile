@@ -187,9 +187,10 @@ Preprocessor configuration:
 		and the tl-meminfo builtin for viewing it from the REPL.
 
 	-DGC_DEBUG
-		Garbage collector debugging; prints out large
-		amounts of information about every collector run,
-		including every object encountered and freed.
+	-DGC_DEBUG=1
+		Garbage collector debugging; prints out large amounts of
+		information about every collector run, including every object
+		encountered and freed when defined to at least 1.
 
 	-DFAKE_ASYNC
 		Move the handling of TL_RESULT_GETCHAR into main(),

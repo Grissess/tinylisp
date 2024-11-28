@@ -65,7 +65,8 @@ void tl_interp_init_alloc(tl_interp *in, void *(*reallocf)(tl_interp *, void *, 
 #endif
 
 	tl_ns_init(in, &in->ns);
-	in->top_alloc = NULL;
+	in->top_alloc = in->free_alloc = NULL;
+	in->oballoc_batch = TL_DEFAULT_OBALLOC_BATCH;
 
 	in->true_ = tl_new_sym(in, "tl-#t");
 	in->false_ = tl_new_sym(in, "tl-#f");

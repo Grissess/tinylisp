@@ -4,6 +4,23 @@
 
 #include "tinylisp.h"
 
+static int _tl_refill_freelist(tl_interp *in, size_t objects) {
+	/* XXX overflow hazard but we don't want memset here */
+	tl_object *list = tl_alloc_malloc(in, objects * sizeof(tl_object));
+	size_t index;
+#ifdef GC_DEBUG
+	tl_printf(in, "refill: 0x%zx objects at %p\n", objects, list);
+#endif
+	if(!list) return 0;
+	for(index = 0; index < objects; index++) {
+		list[index].next_alloc = in->free_alloc;
+		list[index].prev_alloc = NULL;
+		if(in->free_alloc) in->free_alloc->prev_alloc = list + index;
+		in->free_alloc = list + index;
+	}
+	return 1;
+}
+
 /** Create a new object.
  *
  * The object has undefined type, which must be initialized. The more specific
@@ -13,18 +30,37 @@
  * collected if it is not reachable from any root on the next call to `tl_gc`.
  */
 tl_object *tl_new(tl_interp *in) {
+	tl_object *obj = NULL;
 	tl_trace(new_enter, in);
-	tl_object *obj = tl_alloc_malloc(in, sizeof(tl_object));
-	if(!obj) {
-		tl_gc(in);
-		tl_trace(new_retry, in);
-		obj = tl_alloc_malloc(in, sizeof(tl_object));
-		assert(obj);
+
+	/* Is the freelist empty? */
+	if(!in->free_alloc) {
+		if(!_tl_refill_freelist(in, in->oballoc_batch)) {
+			/* If we're here, we can't allocate a full batch. Try just one
+			 * object instead; we'll take it from the freelist momentarily. */
+			if(!_tl_refill_freelist(in, 1)) {
+				/* Still no luck? Try compacting our free memory; this is very expensive. */
+				tl_gc(in);
+				tl_reclaim(in);
+				if(!_tl_refill_freelist(in, 1)) {
+					/* We are well and truly out of memory; no sense in proceeding. */
+					abort();
+				}
+			}
+		}
 	}
+
+	/* Unthread from freelist */
+	obj = in->free_alloc;
+	in->free_alloc = obj->next_alloc;
+	if(in->free_alloc) in->free_alloc->prev_alloc = NULL;
+
+	/* Thread into alloc list */
 	obj->next_alloc = in->top_alloc;
 	obj->prev_alloc = NULL;
 	if(in->top_alloc) in->top_alloc->prev_alloc = obj;
 	in->top_alloc = obj;
+
 	tl_trace(new_exit, in, obj);
 	return obj;
 }
@@ -196,7 +232,7 @@ tl_object *tl_new_ptr(tl_interp *in, void *ptr, void (*gcfunc)(tl_interp *, tl_o
 	return obj;
 }
 
-/** Free an object.
+/** "Free" an object, adding it to a reclaimable freelist.
  *
  * TinyLISP has a tracing GC, so, as a rule, you should never need to do this.
  * However, you may do this if you can prove that you are removing the last
@@ -204,6 +240,15 @@ tl_object *tl_new_ptr(tl_interp *in, void *ptr, void (*gcfunc)(tl_interp *, tl_o
  * optimization is rarely worth the proof (since TL code can easily capture
  * references you don't know about in many cases), so it's best to simply not
  * use this function (except from within `tl_gc`).
+ *
+ * Bizarre behavior can happen with references to objects in the freelist, so
+ * we make an effort to poison them so their use causes issues early. In
+ * particular, this list can be destroyed with ::tl_reclaim, so any such bug is
+ * tantamount to a use-after-free.
+ *
+ * The underyling allocator's "free" is called from ::tl_reclaim. Under memory
+ * pressure (as in ::tl_new), it is best to call ::tl_reclaim immediately after
+ * ::tl_gc.
  */
 void tl_free(tl_interp *in, tl_object *obj) {
 	tl_trace(free_enter, in, obj);
@@ -222,6 +267,21 @@ void tl_free(tl_interp *in, tl_object *obj) {
 	if(tl_next_alloc(obj)) {
 		tl_next_alloc(obj)->prev_alloc = obj->prev_alloc;
 	}
+	if(in->free_alloc) in->free_alloc->prev_alloc = obj;
+	obj->next_alloc = in->free_alloc;
+	obj->prev_alloc = NULL;
+	in->free_alloc = obj;
+	tl_trace(free_exit, in, obj);
+}
+
+/** Well and truly destroys an object, free()ing its memory.
+ *
+ * This is unsafe to do to any live object, and will manifest memory unsafety
+ * and other undefined behavior if you do. It's best to only let ::tl_reclaim
+ * call this function unless you know what you're doing.
+ */
+void tl_destroy(tl_interp *in, tl_object *obj) {
+	tl_trace(destroy_enter, in, obj);
 	switch(obj->kind) {
 		case TL_CFUNC:
 		case TL_CFUNC_BYVAL:
@@ -237,7 +297,7 @@ void tl_free(tl_interp *in, tl_object *obj) {
 			break;
 	}
 	tl_alloc_free(in, obj);
-	tl_trace(free_exit, in, obj);
+	tl_trace(destroy_exit, in, obj);
 }
 
 /** Mark an object and its descendents.
@@ -294,9 +354,13 @@ static void _tl_mark_pass(tl_object *obj) {
 void tl_gc(tl_interp *in) {
 	tl_object *obj = in->top_alloc;
 	tl_object *tmp;
+#ifdef GC_DEBUG
+	size_t freed = 0;
+	tl_printf(in, "gc: starts\n");
+#endif
 	tl_trace(gc_enter, in);
 	while(obj) {
-#ifdef GC_DEBUG
+#if defined(GC_DEBUG) && GC_DEBUG > 0
 		tl_printf(in, "gc: unmark: %p %O\n", obj, obj);
 #endif
 		tl_unmark(obj);
@@ -330,12 +394,36 @@ void tl_gc(tl_interp *in) {
 		obj = tl_next_alloc(obj);
 		if(!tl_is_marked(tmp)) {
 #ifdef GC_DEBUG
+			freed++;
+#if GC_DEBUG > 0
 			tl_printf(in, "gc: free: %p %O\n", tmp, tmp);
+#endif
 #endif
 			tl_free(in, tmp);
 		}
 	}
+#ifdef GC_DEBUG
+	tl_printf(in, "gc: freed 0x%zx objects\n", freed);
+#endif
 	tl_trace(gc_exit, in);
+}
+
+/** Reclaims memory from the interpreter.
+ *
+ * This is most effective after a GC, as it merely drops all entries in the
+ * freelist that ::tl_gc has assembled from unreachable objects. Having these
+ * objects cached is good for performance, but may be undesirable if the
+ * program is under memory pressure; if malloc reports this, ::tl_new calls
+ * this automatically. Thus, regular users shouldn't do this, as it hurts
+ * optimization in the usual cases.
+ */
+void tl_reclaim(tl_interp *in) {
+	tl_object *obj = in->free_alloc, *next;
+	while(obj) {
+		next = tl_next_alloc(obj);
+		tl_destroy(in, obj);
+		obj = next;
+	}
 }
 
 /** Returns the length of a list.

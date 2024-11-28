@@ -335,3 +335,8 @@ void exit(int status) {
 	fprintf(stderr, "exit: program called exit() with status %d\n", status);
 	arch_halt(status);
 }
+
+void abort() {
+	fprintf(stderr, "abort: program aborted\n");
+	arch_halt(_HALT_ERROR);
+}
