@@ -68,12 +68,20 @@ Modules
 TinyLISP can be augmented with loadable modules, provided a suitable dynamic
 linker interface exists. The default on Unix-like systems is to assume `dlopen`
 and `dlsym` are functional. See [main.c](main.c) for the responsibilities of
-the loading function.
+the loading function. Modules may also be statically-linked, as is the default
+on small systems (see below). Statically linked modules are not automatically
+loaded by the interpreter interface; they have to be discovered in the link
+process. See, again, [main.c](main.c), which does this after initializing the
+intepreter. In general, downstreams may call statically initialized modules in
+any way, at any time.
 
 Modules, in [mod](mod/), are not counted toward TinyLISP's line count. They do,
 however, show how one could implement additional functionality, such as more
 general transput and memory-handling capabilities. More libraries are subject
-to be added at any time.
+to be added at any time, and these are not necessarily subject to the same
+scrutiny as TinyLISP's own code. Cautious downstreams may wish to set `MODULES`
+in the build process to a space-separated list of vetted modules, or an empty
+string.
 
 Small Systems
 -------------
