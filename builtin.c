@@ -287,7 +287,7 @@ TL_CFBV(ord, "ord") {
 	arity_n(in, args, 2, "ord");
 	verify_type(in, tl_first(args), sym, "ord");
 	verify_type(in, tl_first(tl_next(args)), int, "ord");
-	if (tl_first(tl_next(args))->ival >= tl_first(args)->nm->here.len || tl_first(tl_next(args)) < 0) {
+	if (tl_first(tl_next(args))->ival >= tl_first(args)->nm->here.len || tl_first(tl_next(args))->ival < 0) {
 		tl_error_set(in, tl_new_pair(in, tl_new_sym(in, "ord index out of range"), tl_new_pair(in, tl_first(tl_next(args)), tl_new_int(in, tl_first(args)->nm->here.len))));
 		return;
 	}
