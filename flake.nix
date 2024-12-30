@@ -21,6 +21,10 @@
                 '';
               });
 
+          apps.default = {
+            program = "${self'.packages.default}/bin/tl";
+          };
+
           devShells.default =
             pkgs.mkShell {
               packages = with pkgs; [ gcc gnumake ];
