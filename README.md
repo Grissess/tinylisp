@@ -49,6 +49,47 @@ As of late, on UNIX, the above can be emulated as
 
 but the former syntax works as well.
 
+Scripts can thus be run as
+
+	./tl script.tl
+
+and multiple scripts can be run sequentially by providing them in order, as in
+
+	./tl std.tl lib.tl script.tl
+
+but note that the interpreter will expect more data from `stdin` after all
+scripts run. If this is undesirable, the standard interpreter provides a
+built-in `tl-exit` which, when applied to an int, exits the interpreter with
+that "exit status". Meanings differ between platforms, but POSIX generally
+holds that only the least significant 8 bits are meaningfully provided to a
+waiting parent process; what is done with this is, again, platform dependent,
+but a POSIX shell usually interprets a value of 0 as "success" or "true" and
+any other value as "failure" or "false", as is useful in the interpretation of
+conditional expressions.
+
+On POSIX systems, when running the interpreter using a non-TTY (according to
+`isatty`) as input, the interpreter automatically suppresses prompt characters
+(`> `) and statements about the value read or any result of evaluation which is
+merely "true" (`tl-#t`) in the REPL. (Most built-in functions that don't return
+a semantically-meaningful value, such as `tl-define`, return `tl-#t`.) This is
+intended to make interoperability with pipelines easier. If this behavior is
+undesirable, the default interpreter has a built-in `tl-quiet` which accepts
+the following integer values:
+
+- `0`: (`QUIET_OFF`) The default when run from a TTY, this shows a prompt (`>
+  `) before reading each expression, announces the expression as read (`Read:
+  `), and prefixes the result of evaluation with `Value: `). It also prints
+  `Done.` when end-of-file is encountered.
+- 1: (`QUIET_NO_PROMPT`) This does not show the prompts (`> `, `Read:`,
+  `Value:`, and `Done.`), but still displays the value read and the result of
+  evaluation.
+- 2: (`QUIET_NO_TRUE`) The default when run from a non-TTY, this suppresses
+  printing the value read and printing the true value `tl-#t`. Other values are
+  still printed.
+- 3: (`QUIET_NO_VALUE`) This suppresses all printing of values.
+
+`tl-display` continues to print out formatted values in all cases.
+
 Embedding
 ---------
 

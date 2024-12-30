@@ -100,11 +100,11 @@ void _main_read_k(tl_interp *in, tl_object *args, tl_object *_) {
 		running = 0;
 		return;  /* Don't push anything, the interpreter is already dead */
 	}
-	if(quiet == QUIET_OFF) {
+	if(quiet == QUIET_OFF || quiet == QUIET_NO_PROMPT) {
 		tl_prompt("Read: ");
 		tl_print(in, expr);
 		fflush(stdout);
-		tl_prompt("\n");
+		tl_putc(in, '\n');
 	}
 	in->current = TL_EMPTY_LIST;
 	tl_eval_and_then(in, expr, NULL, _main_k);
@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
 		quiet = QUIET_NO_TRUE;
 	}
 
-	for(int i = 1; i < argc; i++) {
+	for(int i = argc - 1; i >= 1; i--) {
 		struct input_ent *ent = malloc(sizeof(struct input_ent));
 		ent->next = inputs;
 		inputs = ent;
