@@ -111,7 +111,7 @@ tl_object *_tl_print(tl_interp *in, tl_object *obj, size_t level) {
 			break;
 
 		case TL_PTR:
-			tl_printf(in, "ptr:%p", obj->ptr);
+			tl_printf(in, "ptr(%p):%p", obj->tag, obj->ptr);
 			break;
 
 		default:

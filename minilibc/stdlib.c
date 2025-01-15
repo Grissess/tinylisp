@@ -66,15 +66,37 @@ struct arena {
 #endif
 } *alist = NULL;
 
+#ifdef MEM_DEBUG
+#define tl_sentinel(arena) (arena)->sentinel
+#else
+#define tl_sentinel(arena) ((struct freelist *) 0)
+#endif
+
 #define MIN_HEADER_SIZE (sizeof(struct freelist) * 2 + sizeof(struct arena))
 
 #ifdef MEM_DEBUG
 
 static void mem_sanity(struct arena *arena) {
 	struct freelist *cur, *prev;
-	char *orig_root = (char *) arena->root;
-	size_t orig_size = arena->size;
-	struct freelist *end_ptr = arena->sentinel;
+	char *orig_root;
+	size_t orig_size;
+	struct freelist *end_ptr;
+
+	if(!arena) {
+		fprintf(stderr, "sanity: CRITICAL: NULL arena!\n");
+		return;
+	}
+
+	orig_root = (char *) arena->root;
+	orig_size = arena->size;
+	end_ptr = arena->sentinel;
+
+	if(((char *) arena) >= orig_root && ((char *) arena) < (orig_root + orig_size))
+		fprintf(stderr, "sanity: arena %p is inside its own allocatable area %p to %p (size %p)\n", arena, orig_root, orig_root + orig_size, orig_size);
+	if(arena->next && ((char *) arena->next) >= orig_root && ((char *) arena->next) < (orig_root + orig_size))
+		fprintf(stderr, "sanity: arena %p has next arena %p inside its own allocatable area %p to %p (size %p)\n", arena, arena->next, orig_root, orig_root + orig_size, orig_size);
+	if(arena->next && arena->next == arena)
+		fprintf(stderr, "sanity: arena %p has 1-cycle next to %p\n", arena, arena->next);
 
 	cur = arena->root;
 	while(cur) {
@@ -182,32 +204,34 @@ void *malloc(size_t b) {
 	struct arena *arena = alist;
 	void *area = NULL;
 
-	while(arena) {
+	for(; arena; arena = arena->next) {
 		if(b > arena->size) continue;
 		area = malloc_in_arena(arena, b);
 		if(area) return area;
-		arena = arena->next;
 	}
 
-	if(!arena) {
+	if(!arena) {  /* TODO: tautology */
 		size_t s = 0;
 		void *root = NULL;
 		arch_new_heap(b + MIN_HEADER_SIZE, &root, &s);
+#if defined(MEM_DEBUG) || defined(MEM_DEBUG_ARENAS)
+		fprintf(stderr, "malloc: no extant arena could serve request of size %p; arch_new_heap returns root %p, size %p\n", b, root, s);
+#endif
 		if(!root) {
-#ifdef MEM_DEBUG
-			fprintf(stderr, "malloc: out of heaps!\n");
+#if defined(MEM_DEBUG) || defined(MEM_DEBUG_ARENAS)
+			fprintf(stderr, "malloc: out of heaps! failed request of size %p\n", b);
 #endif
 			return NULL;
 		}
 		if(s < MIN_HEADER_SIZE) {
-#ifdef MEM_DEBUG
-			fprintf(stderr, "malloc: heap too small to alloc!\n");
+#if defined(MEM_DEBUG) || defined(MEM_DEBUG_ARENAS)
+			fprintf(stderr, "malloc: heap too small to alloc! failed request of size %p\n", b);
 #endif
 			arch_release_heap(root, s);
 			return NULL;
 		}
 #if defined(MEM_DEBUG) || defined(MEM_DEBUG_ARENAS)
-		fprintf(stderr, "malloc: init heap at %p size %p\n", root, s);
+		fprintf(stderr, "malloc: init heap at %p size %p for request of size %p\n", root, s, b);
 #endif
 		arena = root;
 		arena->size = s;
@@ -226,12 +250,12 @@ void *malloc(size_t b) {
 		arena->freeroot = arena->root;
 		arena->next = alist;
 		alist = arena;
-#ifdef MEM_DEBUG
-		fprintf(stderr, "malloc: new arena %p root %p freeroot %p size %p next %p sentinel %p\n", arena, arena->root, arena->freeroot, arena->size, arena->next, arena->sentinel);
+#if defined(MEM_DEBUG) || defined(MEM_DEBUG_ARENAS)
+		fprintf(stderr, "malloc: new arena %p root %p freeroot %p size %p next %p sentinel %p\n", arena, arena->root, arena->freeroot, arena->size, arena->next, tl_sentinel(arena));
 #endif
 	}
 	area = malloc_in_arena(arena, b);
-#ifdef MEM_DEBUG
+#if defined(MEM_DEBUG) || defined(MEM_DEBUG_ARENAS)
 	if(!area) {
 		fprintf(stderr, "malloc: newly allocated heap %p size %p cannot satisfy request for %p bytes, aborting\n", arena->root, arena->size, b);
 	}

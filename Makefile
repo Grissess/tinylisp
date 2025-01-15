@@ -5,7 +5,7 @@ LIB :=
 INITSCRIPT_OBJ :=
 SRC = $(patsubst %.o,%.c,$(OBJ))
 CFLAGS ?= -g -std=gnu99 -DDEBUG $(ADD_CFLAGS)
-LDFLAGS ?= -Wl,-rpath='$$ORIGIN' $(ADD_LDFLAGS)
+LDFLAGS ?= $(ADD_LDFLAGS)
 DESTDIR ?= /usr/local/
 BINPATH ?= $(DESTDIR)/bin/
 LIBPATH ?= $(DESTDIR)/lib/
@@ -302,6 +302,7 @@ endif
 ifeq ($(STATIC),)
 	CFLAGS += -fPIC
 	LIBSUFF := .so
+	LDFLAGS += -Wl,-rpath='$$ORIGIN'
 $(APPOBJ): CFLAGS += -DSHARED_LIB
 else
 	LIBSUFF := .a

@@ -50,12 +50,17 @@ void arch_new_heap(size_t min_sz, void **region, size_t *sz) {
 		arch_heap_was_init = 1;
 		*region = (void *)MEM_BASE;
 		*sz = MEM_SIZE;
+		fprintf(stderr, "%s: gave heap %p len %p\n", __func__, *region, *sz);
 	} else {
 		fprintf(stderr, "%s: no more heap\n", __func__);
 	}
 }
 
 void arch_release_heap(void *region, size_t sz) {
+	if(arch_heap_was_init)
+		fprintf(stderr, "%s: released heap at %p size %p\n", __func__, region, sz);
+	else
+		fprintf(stderr, "%s: double-free at %p size %p\n", __func__, region, sz);
 	arch_heap_was_init = 0;
 }
 

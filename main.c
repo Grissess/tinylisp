@@ -252,7 +252,7 @@ int main(int argc, char **argv) {
 		tl_print(in, in->top_env);
 #ifdef NS_DEBUG
 		tl_prompt("Namespace:\n");
-		tl_ns_print(in, in->ns);
+		tl_ns_print(in, &in->ns);
 #endif
 		fflush(stdout);
 		tl_prompt("\n");
@@ -312,7 +312,7 @@ int main(int argc, char **argv) {
 #endif
 #ifdef NS_DEBUG
 		tl_prompt("Namespace:\n");
-		tl_ns_print(in, in->ns);
+		tl_ns_print(in, &in->ns);
 #endif
 	}
 }

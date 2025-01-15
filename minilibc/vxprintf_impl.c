@@ -59,6 +59,11 @@ hexadecimal:
 					fmt--;  /* jump to ld assumes *fmt == 'l' */
 					goto decimal;
 
+				case 'u':
+					temp.ulint = (unsigned long)va_arg(ap, unsigned);  /* TODO: this will be surprising on overflow */
+					fmt--;
+					goto decimal;
+
 				case 'l':  /* XXX d */
 					temp.lint = va_arg(ap, long);
 decimal:
