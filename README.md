@@ -98,6 +98,27 @@ In general, the major interface will be the pair `tl_eval_and_then` to
 initialize the evaluation of an expression, followed by `tl_run_until_done` to
 crank the interpreter until the final continuation is called.
 
+In environments where indefinite pauses are not permissible (such as hard real
+time environments), or where concurrent interpreters may be interleaved, one
+may also use `tl_apply_next` directly, which will do one apply operation (a
+fundamental interpreter step) and return a status code:
+
+- `TL_RESULT_DONE` (`0`): The interpreter has finished without error, and no
+  more work remains to be done.
+
+- `TL_RESULT_AGAIN` (`1`): The interpreter has finished one operation, but
+  `tl_apply_next` must be called again to make further progress.
+
+- `TL_RESULT_GETCHAR` (`2`): The interpreter needs a character. In a
+  synchronous environment, one can use `tl_getc`; in asynchronous environments,
+  one must wait for the next event. In either case, the character received
+  should be pushed to the value stack as a `tl_int` before the next call to
+  `tl_apply_next`. (See the documentation on the Continuation and Value Stacks
+  below.)
+
+Note that the latency of other methods, such as C functions called directly or
+indirectly by TL code, cannot be controlled by TL.
+
 On ELF systems, TL supports `INITSCRIPTS`, embedded binary data that contains
 programs that are "read from input" initially. This may be useful to set up a
 standard environment in embedded applications. See the [Makefile](Makefile) for
@@ -271,7 +292,10 @@ TL is:
 where `...` is the syntactic translation, using the appropriate `quasiquote`
 macros. But, of course, macros are not so restricted--they can implement
 arbitrary functionality, including invoking other macros. This can be used for
-advanced features, such as lazy evaluation.
+advanced features, such as lazy evaluation or domain specific languages (DSLs).
+`quasiquote` is, in fact, implemented as a macro that processes its argument as
+a DSL, and so symbols such as `@` and `,` have no special meaning outside of
+it.
 
 In short, the TL evaluator is a "Call by Push Value" (CBPV) interpreter, and
 can thus implement many different modalities of lambda calculus evaluation.
