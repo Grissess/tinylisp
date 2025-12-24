@@ -253,6 +253,21 @@ tl_object *tl_new_ptr(tl_interp *in, void *ptr, void (*gcfunc)(tl_interp *, tl_o
 void tl_free(tl_interp *in, tl_object *obj) {
 	tl_trace(free_enter, in, obj);
 	if(!obj) return;
+	switch(obj->kind) {
+		case TL_CFUNC:
+		case TL_CFUNC_BYVAL:
+		case TL_THEN:
+			tl_alloc_free(in, obj->name);
+			break;
+
+		case TL_PTR:
+			if(obj->gcfunc) obj->gcfunc(in, obj);
+			obj->ptr = NULL;  /* poison, hopefully */
+			break;
+
+		default:
+			break;
+	}
 	if(obj->prev_alloc) {
 		obj->prev_alloc->next_alloc = tl_make_next_alloc(
 			obj->prev_alloc->next_alloc,
@@ -282,20 +297,6 @@ void tl_free(tl_interp *in, tl_object *obj) {
  */
 void tl_destroy(tl_interp *in, tl_object *obj) {
 	tl_trace(destroy_enter, in, obj);
-	switch(obj->kind) {
-		case TL_CFUNC:
-		case TL_CFUNC_BYVAL:
-		case TL_THEN:
-			tl_alloc_free(in, obj->name);
-			break;
-
-		case TL_PTR:
-			if(obj->gcfunc) obj->gcfunc(in, obj);
-			break;
-
-		default:
-			break;
-	}
 	tl_alloc_free(in, obj);
 	tl_trace(destroy_exit, in, obj);
 }
