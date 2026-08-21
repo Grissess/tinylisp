@@ -101,9 +101,25 @@
   (lambda (a b)
     (not (nand a b))))
 
+(define and*
+  (lambda l
+    (if (null? l)
+      #t
+      (if (not (car l))
+        #f
+        (apply and* (cdr l))))))
+
 (define or
   (lambda (a b)
     (nand (not a) (not b))))
+
+(define or*
+  (lambda l
+    (if (null? l)
+      #f
+      (if (car l)
+        #t
+        (apply or* (cdr l))))))
 
 (define <=
   (lambda (a b)

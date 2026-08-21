@@ -336,8 +336,8 @@ TL_CFBV(substr, "substr") {
 	 * promotion makes these unsigned comparisons, always true if the long is
 	 * negative.
 	 */
-	if(sidx >= sym->nm->here.len) {
-		sidx = sym->nm->here.len - 1;
+	if(sidx > sym->nm->here.len) {
+		sidx = sym->nm->here.len;
 	}
 	if(eidx > sym->nm->here.len) {
 		eidx = sym->nm->here.len;
@@ -345,7 +345,11 @@ TL_CFBV(substr, "substr") {
 	if(sidx >= eidx) {
 		sidx = eidx;
 	}
-	tl_cfunc_return(in, tl_new_sym_data(in, sym->nm->here.data + sidx, eidx - sidx));
+	if(sidx == eidx) {
+		tl_cfunc_return(in, tl_new_sym_data(in, NULL, 0));
+	} else {
+		tl_cfunc_return(in, tl_new_sym_data(in, sym->nm->here.data + sidx, eidx - sidx));
+	}
 }
 
 static void _tl_readc_k(tl_interp *in, tl_object *args, tl_object *state) {
